@@ -1,1 +1,32 @@
-/.venv/
+# Virtual environment
+**/.venv/
+**/venv
+
+# Python files to ignore
+*.pyc
+*.pyo
+*.pyd
+**/__pycache__/
+
+# Database files
+*.db
+*.sqlit3
+
+# Ignore compiled static files
+staticfiles/
+meida/
+node_modules/
+
+
+# Ignore Django logs
+logs/
+*.log
+
+
+# Ignore environment vairables & secrets
+.env
+.env.local
+
+# Ignore Django migrations except `__init__.py`
+**/migrations/**/*
+!**/migrations/__init__.py

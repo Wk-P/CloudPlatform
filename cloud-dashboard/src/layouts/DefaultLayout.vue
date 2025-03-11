@@ -38,7 +38,12 @@ const route = useRoute();
     padding: 10px;
 }
 .el-aside {
-    background-color: #f5f5f5;
+    /* background-color: #f5f5f5; */
     height: 100vh;
+    border: 1px solid var(--el-menu-border-color);
+}
+
+.el-menu {
+    border: none;
 }
 </style>

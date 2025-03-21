@@ -40,10 +40,6 @@ INSTALLED_APPS = [
     # Third-patry apps
     'rest_framework',
     'corsheaders',
-
-    # Custom apps
-    'apps.clusters',
-    'apps.monitoring',
 ]
 
 MIDDLEWARE = [

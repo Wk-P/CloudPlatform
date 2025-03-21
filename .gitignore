@@ -10,7 +10,7 @@
 
 # Database files
 *.db
-*.sqlit3
+*.sqlite3
 
 # Ignore compiled static files
 staticfiles/

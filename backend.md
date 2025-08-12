@@ -1,13 +1,12 @@
-# 开发计划
-开发计划
+# 开发计划 Development Schedule
 - **Google drive**   
 `https://docs.google.com/spreadsheets/d/1ARk2cffz5Z87JNdB0r9kxZUGX4lG_xVBqmeZGHFJQAs/edit?usp=sharing`
 <br>
 <br>
 <br>
 
-# 后端开发日志
-## 2025年8月12日
+# 后端开发日志 Backend Development Log 
+## 2025-08-12
 Django 后端与 k8s API 更多连接
 - Remote-DMA 设计
 - zeek 监视
@@ -16,7 +15,7 @@ Django 后端与 k8s API 更多连接
 
 
 
-## 2025年8月13日
+## 2025-08-13
 静态资源监测
 - 节点
 - pod

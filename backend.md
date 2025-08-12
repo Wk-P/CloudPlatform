@@ -43,15 +43,21 @@ Django (Version 5.1.7)
 
 
 ### k8s token 验证
-目前：手动请求令牌（长时间），关闭 https 严格 SSL 证书检查，token 放入 http 中的 header。
-开发：利用 k8s 平台先创建对应的 
-- django-agent (Cluster -> Service Accounts -> Roles) 目的是提供 token
-- django-agent-read 目的是绑定到
+目前：手动请求令牌（长时间），关闭 https 严格 SSL 证书检查，token 放入 http 中的 header。   
+开发：利用 k8s 平台先创建对应的 Service Account 和权限控制清单
+<br>
+访问权限细则请查看 `minikube dashboard`   
+文档如下（待补充）
 
 ### 监视应用模块
+基础静态资源通过
 利用 metrics 模块进行数据收集
 
 
+### 数据库保存模型
+1. Cluster 
+2. SA
+3. Command 
 
 # 后端开发日志 Backend Development Log 
 ## 2025-08-12
@@ -59,12 +65,23 @@ Django 后端与 k8s API 更多连接
 - Remote-DMA 设计
 - zeek 监视
 - API 制作
+
+问题总结：
+1. zeek 抓取到的数据和模型输入不匹配 （预处理问题）
+2. 需要针对模型检测到的异常流量做出反应   
+    - IP 封锁
+    - 流量大小限制
+3. DMA 实现困难
+
+
 补充开发日志
 
 
-
 ## 2025-08-13
-静态资源监测
+1. 完善 API 结构
+- 针对不同资源完善 API
+
+2. 静态资源监测
 - 节点
 - pod
 - 虚拟机

@@ -8,6 +8,11 @@ You can use dashbord instead of commands to control your cluster system like Kub
 
 
 ## Install
-    - 
+
+
+
+## Deveploment Log file
+- `backend.md`
+- `frontend.md`
 
 

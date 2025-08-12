@@ -11,6 +11,8 @@ from .models import CommandRecord
 
 from kubernetes import client, config
 
+
+# Send commands to k8s and 
 @csrf_exempt 
 @require_http_methods(["POST"])
 def run_command(request):

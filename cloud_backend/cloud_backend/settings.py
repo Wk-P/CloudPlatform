@@ -16,6 +16,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# URL Slash setting
+APPEND_SLASH=False
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
@@ -40,6 +43,12 @@ INSTALLED_APPS = [
     # Third-patry apps
     'rest_framework',
     'corsheaders',
+
+    # Custom apps
+    'anomaly_detection',
+    'authentication',
+    'runtime_monitoring',
+    'state_manager',
 ]
 
 MIDDLEWARE = [
@@ -78,14 +87,18 @@ WSGI_APPLICATION = 'cloud_backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.mysql',
+    #     'NAME': 'cloudplatform',
+    #     'USER': 'cloudadmin',
+    #     'PASSWORD': 'soar009@CloudAdmin',
+    #     'HOST': '192.168.0.247',
+    #     'PORT': '3306',
+    #     'OPTIONS': {'charset': 'utf8mb4'},
+    # }
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'cloudplatform',
-        'USER': 'cloudadmin',
-        'PASSWORD': 'soar009@CloudAdmin',
-        'HOST': '192.168.0.247',
-        'PORT': '3306',
-        'OPTIONS': {'charset': 'utf8mb4'},
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -139,6 +152,13 @@ CORS_ALLOWRD_ORIGINS = [
 
 # Rest Framework settings
 REST_FRAMEWORK = {
-    'DEFAULT_RENDERER_CLASSES': ('rest_framework.renders.JSONRender',),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
     'DEFAULT_PARSER_CLASSES': ('rest_framework.parsers.JSONParser',),
 }
+
+
+# authenticated user
+AUTH_USER_MODEL = 'authentication.ManagerCustomUser'

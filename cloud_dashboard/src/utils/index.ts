@@ -4,16 +4,18 @@ const runtime_api = {
     url: '/api/runtime',
     resources: {
         clusters: '/clusters/baseinfo/',
-        cluster: '/cluster/',
         nodes: '/nodes/',
         pods: '/pods/',
-        deployment: '/deployments/',
+        services: '/services/',
+        events: '/events/',
+        deployments: '/deployments/',
         daemonsets: '/daemonsets/',
-        statefulsets: '/statefulstes/',
+        statefulsets: '/statefulsets/',
+        namespaces: '/namespaces/',
     },
     options: {
         cluster: {
-            add: '/cluster/add/',
+            add: '/clusters/add/',
         },
     },
 };
@@ -31,12 +33,18 @@ const state_api = {
     }
 };
 
+const authHeaders = (): HeadersInit => {
+    const token = localStorage.getItem('cloud-dashboard-token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+};
+
 const getRuntimeApiFullUrl = (resource_name: keyof typeof runtime_api.resources, cluster_id?: string) => {
     if (resource_name === 'clusters') {
         return `${runtime_api.url}${runtime_api.resources.clusters}`;
-    } else {
-        return `${runtime_api.url}/${cluster_id}${runtime_api.resources[resource_name]}`;
     }
+    return `${runtime_api.url}/clusters/${cluster_id}${runtime_api.resources[resource_name]}`;
 };
 
 export const registerNewCluster = async (new_cluster_params: NewClusterParams) => {
@@ -44,7 +52,7 @@ export const registerNewCluster = async (new_cluster_params: NewClusterParams) =
         const url = `${runtime_api.url}${runtime_api.options.cluster.add}`;
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
             body: JSON.stringify({
                 api_server: new_cluster_params.api_server,
                 port: new_cluster_params.port,
@@ -60,14 +68,41 @@ export const registerNewCluster = async (new_cluster_params: NewClusterParams) =
     }
 };
 
-export const getResourcesInfo = async (resource_name: keyof typeof runtime_api.resources, cluster_id?: string) => {
+const buildQuery = (params?: Record<string, string | number | boolean | undefined | null>) => {
+    if (!params) return '';
+    const sp = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v === undefined || v === null || v === '') return;
+        sp.append(k, String(v));
+    });
+    const qs = sp.toString();
+    return qs ? `?${qs}` : '';
+};
+
+export const getResourcesInfo = async (
+    resource_name: keyof typeof runtime_api.resources,
+    cluster_id?: string,
+    params?: Record<string, string | number | boolean | undefined | null>
+) => {
     try {
-        const url = getRuntimeApiFullUrl(resource_name, cluster_id);
-        const response = await fetch(url);
+        const base = getRuntimeApiFullUrl(resource_name, cluster_id);
+        const url = `${base}${buildQuery(params)}`;
+        const response = await fetch(url, { headers: { ...authHeaders() } });
         const result = await response.json();
         return result;
     } catch (error) {
         console.error(error);
+        return null;
+    }
+};
+
+export const getNamespaces = async (cluster_id: string) => {
+    try {
+        const url = `${runtime_api.url}/clusters/${cluster_id}${runtime_api.resources.namespaces}`;
+        const response = await fetch(url, { headers: { ...authHeaders() } });
+        return await response.json();
+    } catch (e) {
+        console.error(e);
         return null;
     }
 };
@@ -93,20 +128,62 @@ export const windowRefresh = () => {
     window.location.reload();
 };
 
-export const postCommand = async (cmd: string) => {
+export type CommandPayload = {
+    action: 'get' | 'describe' | 'logs' | 'apply' | 'delete' | 'scale';
+    resource?: 'pods' | 'services' | 'deployments';
+    cluster_id: string;
+    namespace?: string;
+    name?: string;
+    tail_lines?: number;
+    // advanced
+    manifest?: string | Record<string, unknown> | Array<Record<string, unknown>>;
+    kind?: string; // delete can pass kind directly (overrides resource mapping)
+    replicas?: number; // for scale
+};
+
+export const postCommand = async (payload: CommandPayload) => {
     try {
         const url = `${state_api.url}${state_api.cmd.run}`;
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cmd: cmd,
-            }),
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify(payload),
         });
         const result = await response.json();
 
+        const buildCmd = () => {
+            const ns = payload.namespace ? ` -n ${payload.namespace}` : '';
+            const res = payload.resource ? ` ${payload.resource}` : '';
+            if (payload.action === 'apply') return `apply`;
+            if (payload.action === 'delete') {
+                const k = payload.kind || payload.resource || '';
+                const nm = payload.name ? ` ${payload.name}` : '';
+                return `delete ${k}${nm}${ns}`.trim();
+            }
+            if (payload.action === 'scale') {
+                const nm = payload.name ? ` ${payload.name}` : '';
+                const r = payload.replicas != null ? ` --replicas=${payload.replicas}` : '';
+                return `scale deployments${nm}${ns}${r}`.trim();
+            }
+            const nm = payload.name ? ` ${payload.name}` : '';
+            const tl = payload.tail_lines ? ` --tail=${payload.tail_lines}` : '';
+            return `${payload.action}${res}${ns}${nm}${tl}`.trim();
+        };
+
+        // If backend returned error (4xx/5xx), surface it clearly
+        if (!response.ok) {
+            const cmd_error: CommandResult = {
+                cmd: buildCmd(),
+                cmd_status: 'error',
+                status_code: response.status,
+                output: '',
+                error: result?.error || response.statusText || 'Request failed',
+            };
+            return cmd_error;
+        }
+
         const cmd_result: CommandResult = {
-            cmd: cmd,
+            cmd: buildCmd(),
             cmd_status: result.status,
             status_code: result.returncode,
             output: result.stdout,
@@ -122,7 +199,7 @@ export const postCommand = async (cmd: string) => {
 export const getClusterUsage = async (id: string) => {
     try {
         const url = `${state_api.url}${state_api.cluster}${id}/`;
-        const response = await fetch(url);
+    const response = await fetch(url, { headers: { ...authHeaders() } });
         const result = await response.json();
         console.log(result);
         return result;
@@ -135,8 +212,8 @@ export const getClusterUsage = async (id: string) => {
 
 export const getAllNodesList  = async (id: string) => {
     try {
-        const url = `${runtime_api.url}${runtime_api.resources.cluster}${id}${runtime_api.resources.nodes}`;
-        const response = await fetch(url);
+    const url = `${runtime_api.url}/clusters/${id}${runtime_api.resources.nodes}`;
+    const response = await fetch(url, { headers: { ...authHeaders() } });
         const result = await response.json();
         console.log(result);
         return result;
@@ -149,7 +226,7 @@ export const getAllNodesList  = async (id: string) => {
 export const getNodeUsage = async (cluster_id: string, name: string) => {
     try {
         const url = `${state_api.url}${state_api.node.single}${cluster_id}/${name}/`;
-        const response = await fetch(url);
+    const response = await fetch(url, { headers: { ...authHeaders() } });
         const result = await response.json();
         return result;
     } catch (error) {

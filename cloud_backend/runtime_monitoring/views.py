@@ -8,6 +8,8 @@ from kubernetes import client
 from django.utils import timezone
 import json
 import uuid
+from django.conf import settings
+from authentication.jwt_utils import jwt_required
 
 def get_clusters_base_info_list(request):
     results = list(KubeCluster.objects.all().values())
@@ -31,11 +33,11 @@ def get_cluster_info(request, id):
                     {
                         "port": p.port,
                         "target_port": p.target_port,
-                        "protocol": p.protocal
+            "protocol": getattr(p, 'protocol', None)
                     } for p in svc.spec.ports or []
                 ],
                 "type": svc.spec.type,
-                "url": f"https://{cluster.api_server}:{cluster.port}/api/v1/namespaces/kube-system/services/{svc.metadata}/proxy"
+        "url": f"https://{cluster.api_server}:{cluster.port}/api/v1/namespaces/kube-system/services/{svc.metadata.name}/proxy"
             })
         return JsonResponse({
             "api_server": f"https://{cluster.api_server}:{cluster.port}",
@@ -46,13 +48,28 @@ def get_cluster_info(request, id):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@jwt_required
 def add_cluster_simple(request):
     try:
-        body = json.loads(request.body)
+        # accept both JSON body and form-encoded payloads
+        try:
+            body = json.loads(request.body or b"{}")
+        except Exception:
+            # fallback to POST dict when content_type mismatches
+            body = request.POST.dict() if hasattr(request, "POST") else {}
+
         api_server = body.get("api_server")
-        port = int(body.get("port", 8443))
         token = body.get("token")
-        name = body.get('name')
+        # port may come as str; default to 8443
+        try:
+            port = int(body.get("port", 8443))
+        except Exception:
+            port = 8443
+        name = body.get('name') or "auto"
+
+        # basic validation
+        if not api_server or not token:
+            return JsonResponse({"error": "api_server and token are required"}, status=400)
 
         # verify connection
         configuration = client.Configuration()
@@ -78,9 +95,16 @@ def add_cluster_simple(request):
 
         return JsonResponse({
             "message": "Cluster Add Success",
-            "new_cluster": cluster
+            "version": getattr(version_info, 'git_version', None) or getattr(version_info, 'gitVersion', None),
+            "new_cluster": {
+                "id": cluster.id,
+                "name": cluster.name,
+                "api_server": cluster.api_server,
+                "port": cluster.port,
+                "description": cluster.description,
+                "cluster_id": cluster.cluster_id,
+            }
         })
-
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
@@ -105,21 +129,45 @@ def get_pods(request, id):
     v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
 
     try:
-        pods = v1.list_pod_for_all_namespaces()     # V1PodList
+        # filters
+        ns = request.GET.get('namespace')
+        label_selector = request.GET.get('labelSelector')
+        limit = request.GET.get('limit')
+        continue_token = request.GET.get('continue')
+
+        list_kwargs = {}
+        if label_selector:
+            list_kwargs['label_selector'] = label_selector
+        if limit:
+            try:
+                list_kwargs['limit'] = int(limit)
+            except Exception:
+                pass
+        if continue_token:
+            list_kwargs['_continue'] = continue_token
+
+        # choose API based on namespace
+        if ns:
+            pods = v1.list_namespaced_pod(ns, **list_kwargs)
+        else:
+            pods = v1.list_pod_for_all_namespaces(**list_kwargs)     # V1PodList
         data = []
 
         # pod: V1Pod
         for pod in pods.items:
-             data.append({
+            data.append({
                 "namespace": pod.metadata.namespace,
                 "name": pod.metadata.name,
                 "status": pod.status.phase,
                 "node": pod.spec.node_name,
-                "restarts": sum([c.restart_count for c in pod.status.container_statuses or []]),
-                "created_at": pod.metadata.creation_timestamp.isoformat()
+                "restarts": sum([(c.restart_count or 0) for c in (pod.status.container_statuses or [])]),
+                "created_at": pod.metadata.creation_timestamp.isoformat() if getattr(pod.metadata, 'creation_timestamp', None) else None
             })
-             
-        return JsonResponse({"pods": data})
+        
+        resp = {"pods": data}
+        if hasattr(pods, 'metadata') and getattr(pods.metadata, '_continue', None):
+            resp['continue'] = pods.metadata._continue
+        return JsonResponse(resp)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500) 
     
@@ -127,7 +175,13 @@ def get_services(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        services = v1.list_service_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        label_selector = request.GET.get('labelSelector')
+        list_kwargs = {}
+        if label_selector:
+            list_kwargs['label_selector'] = label_selector
+
+        services = v1.list_namespaced_service(ns, **list_kwargs) if ns else v1.list_service_for_all_namespaces(**list_kwargs)
         data = [{"name": s.metadata.name, "namespace": s.metadata.namespace} for s in services.items]
         return JsonResponse({"services": data})
     except Exception as e:
@@ -138,7 +192,8 @@ def get_events(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        events = v1.list_event_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        events = v1.list_namespaced_event(ns) if ns else v1.list_event_for_all_namespaces()
         data = [{"message": e.message, "type": e.type} for e in events.items]
         return JsonResponse({"events": data})
     except Exception as e:
@@ -147,22 +202,13 @@ def get_events(request, id):
 # apps, batch, autoscaling, etc
 from .kube_client import get_apps_client, get_batch_client, get_autoscaling_client, get_networking_client, get_rbac_client, get_extensions_client
 
-def get_deployments(request, id):
-    cluster = get_object_or_404(KubeCluster, id=id)
-    apps = get_apps_client(cluster.api_server, cluster.port, cluster.token)
-    try:
-        deployments = apps.list_deployment_for_all_namespaces()
-        data = [{"name": d.metadata.name, "namespace": d.metadata.namespace} for d in deployments.items]
-        return JsonResponse({"deployments": data})
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
 
 def get_jobs(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     batch = get_batch_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        jobs = batch.list_job_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        jobs = batch.list_namespaced_job(ns) if ns else batch.list_job_for_all_namespaces()
         data = [{"name": j.metadata.name} for j in jobs.items]
         return JsonResponse({"jobs": data})
     except Exception as e:
@@ -172,7 +218,15 @@ def get_deployments(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        deployments = apps_v1.list_deployment_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        label_selector = request.GET.get('labelSelector')
+        list_kwargs = {}
+        if label_selector:
+            list_kwargs['label_selector'] = label_selector
+        deployments = (
+            apps_v1.list_namespaced_deployment(ns, **list_kwargs)
+            if ns else apps_v1.list_deployment_for_all_namespaces(**list_kwargs)
+        )
         data = [
             {
                 "namespace": d.metadata.namespace,
@@ -191,7 +245,11 @@ def get_daemonsets(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        daemonsets = apps_v1.list_daemon_set_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        daemonsets = (
+            apps_v1.list_namespaced_daemon_set(ns)
+            if ns else apps_v1.list_daemon_set_for_all_namespaces()
+        )
         data = [
             {
                 "namespace": d.metadata.namespace,
@@ -210,7 +268,11 @@ def get_statefulsets(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        statefulsets = apps_v1.list_stateful_set_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        statefulsets = (
+            apps_v1.list_namespaced_stateful_set(ns)
+            if ns else apps_v1.list_stateful_set_for_all_namespaces()
+        )
         data = [
             {
                 "namespace": s.metadata.namespace,
@@ -228,7 +290,11 @@ def get_replicasets(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
     apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
     try:
-        replicasets = apps_v1.list_replica_set_for_all_namespaces()
+        ns = request.GET.get('namespace')
+        replicasets = (
+            apps_v1.list_namespaced_replica_set(ns)
+            if ns else apps_v1.list_replica_set_for_all_namespaces()
+        )
         data = [
             {
                 "namespace": r.metadata.namespace,
@@ -239,5 +305,16 @@ def get_replicasets(request, id):
             for r in replicasets.items
         ]
         return JsonResponse({"replicasets": data})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+def get_namespaces(request, id):
+    cluster = get_object_or_404(KubeCluster, id=id)
+    v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    try:
+        nss = v1.list_namespace()
+        data = [{"name": ns.metadata.name, "status": getattr(ns.status, 'phase', None)} for ns in nss.items]
+        return JsonResponse({"namespaces": data})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

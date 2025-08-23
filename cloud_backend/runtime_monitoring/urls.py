@@ -8,20 +8,21 @@ urlpatterns = [
     path('clusters/<int:id>/cluster/', rm_views.get_cluster_info, name='get_cluster'),
     
     # base resources
-    path('cluster/add/', rm_views.add_cluster_simple, name='add_cluster'),
-    path('cluster/<int:id>/nodes/', rm_views.get_nodes, name='get_nodes'),
-    path('cluster/<int:id>/pods/', rm_views.get_pods, name='get_pods'),
-    path('cluster/<int:id>/services/', rm_views.get_services, name='get_services'),
-    path('cluster/<int:id>/events/', rm_views.get_events, name='get_events'),
+    path('clusters/add/', rm_views.add_cluster_simple, name='add_cluster'),
+    path('clusters/<int:id>/nodes/', rm_views.get_nodes, name='get_nodes'),
+    path('clusters/<int:id>/pods/', rm_views.get_pods, name='get_pods'),
+    path('clusters/<int:id>/services/', rm_views.get_services, name='get_services'),
+    path('clusters/<int:id>/events/', rm_views.get_events, name='get_events'),
+    path('clusters/<int:id>/namespaces/', rm_views.get_namespaces, name='get_namespaces'),
 
     # apps
-    path('cluster/<int:id>/deployments/', rm_views.get_deployments, name='get_deployments'),
-    path('cluster/<int:id>/daemonsets/', rm_views.get_daemonsets, name='get_daemonsets'),
-    path('cluster/<int:id>/statefulsets/', rm_views.get_statefulsets, name='get_statefulsets'),
-    path('cluster/<int:id>/replicasets/', rm_views.get_replicasets, name='get_replicasets'),
+    path('clusters/<int:id>/deployments/', rm_views.get_deployments, name='get_deployments'),
+    path('clusters/<int:id>/daemonsets/', rm_views.get_daemonsets, name='get_daemonsets'),
+    path('clusters/<int:id>/statefulsets/', rm_views.get_statefulsets, name='get_statefulsets'),
+    path('clusters/<int:id>/replicasets/', rm_views.get_replicasets, name='get_replicasets'),
 
     # batch
-    path('cluster/<int:id>/jobs/', rm_views.get_jobs, name='get_jobs'),
+    path('clusters/<int:id>/jobs/', rm_views.get_jobs, name='get_jobs'),
 
     # more
 ]

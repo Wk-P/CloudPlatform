@@ -62,6 +62,18 @@ Django (Version 5.1.7)
 
 
 # 后端开发日志 Backend Development Log 
+## 2025-08-23
+- Kubernetes 高级指令支持（state_manager.views.run_command）
+    - 新增 actions: apply、delete、scale；使用 DynamicClient 执行 Server-Side Apply（apply-patch+yaml），失败回退 create；delete 支持 kind/resource 映射与命名空间/集群作用域判断；scale 通过 AppsV1Api patch Scale。
+    - 支持 manifest 直接传字符串（YAML 多文档或 JSON 对象/数组）；解析失败返回明确错误；新增“未解析到对象”的提示，避免空结果。
+    - 强化参数校验与错误处理：按动作的必填校验，集群 ID（id/cluster_id）解析，已知错误返回 400/404，未知错误捕获为 500。
+    - 命令运行记录持久化（CommandRecord）：stdout/stderr/returncode/status；长输出安全截断。
+- 安全/认证
+    - 接口继续使用 JWT Bearer 校验（jwt_required）。
+- RBAC 与联调
+    - 提供 Linux 下查看/赋权 SA 的一次性脚本；测试环境示例绑定 cluster-admin，并给出回滚命令。
+    - 联调验证 apply 流程（修正 YAML 换行与 apiVersion 拼写问题），成功创建/更新 Deployment。
+
 ## 2025-08-12
 Django 后端与 k8s API 更多连接
 - Remote-DMA 设计

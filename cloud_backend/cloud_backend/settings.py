@@ -146,7 +146,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Allow frontend (Vue) to access backend (Django API)
-CORS_ALLOWRD_ORIGINS = [
+CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173'
 ]
 
@@ -162,3 +162,22 @@ REST_FRAMEWORK = {
 
 # authenticated user
 AUTH_USER_MODEL = 'authentication.ManagerCustomUser'
+
+# Minimal JWT settings (for experimental use)
+JWT_SETTINGS = {
+    'SECRET': SECRET_KEY,
+    'ALGORITHM': 'HS256',
+    'EXP_MINUTES': 60,
+    # When True, endpoints using @jwt_required will enforce JWT strictly.
+    'ENFORCE': False,
+}
+
+# Kubernetes client TLS and request options
+# VERIFY_SSL: verify server certificate. In dev, keep False. In prod, set True.
+# CA_CERT: optional path to cluster CA cert file when VERIFY_SSL=True.
+# REQUEST_TIMEOUT: per-call timeout seconds passed to client calls where used.
+K8S_TLS = {
+    'VERIFY_SSL': False,
+    'CA_CERT': None,
+    'REQUEST_TIMEOUT': 10,
+}

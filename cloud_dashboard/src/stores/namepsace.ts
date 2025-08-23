@@ -6,10 +6,9 @@ export const useNamespaceStore = defineStore('namespace', () => {
     const currentNamespace = ref<Namespace | null>(null);
     const localStoragePreStr = 'cloud-dashboard-';
 
-    const setCurrentNamespace = (cluster: Namespace) => {
-        currentNamespace.value = cluster;
-
-        localStorage.setItem(`${localStoragePreStr}current-cluster`, JSON.stringify(currentNamespace.value));
+    const setCurrentNamespace = (ns: Namespace) => {
+        currentNamespace.value = ns;
+        localStorage.setItem(`${localStoragePreStr}current-namespace`, JSON.stringify(currentNamespace.value));
     };
 
     const getCurrentNamespace = () => {
@@ -18,12 +17,12 @@ export const useNamespaceStore = defineStore('namespace', () => {
 
     const removeCurrentNamespace = () => {
         currentNamespace.value = null;
-        localStorage.removeItem(`${localStoragePreStr}current-cluster`);
+        localStorage.removeItem(`${localStoragePreStr}current-namespace`);
     };
 
     const loadCurrentNamespace = () => {
-        const localStorageCurrentNamespace = localStorage.getItem(`${localStoragePreStr}current-cluster`);
-        if (localStorageCurrentNamespace) currentNamespace.value = JSON.parse(localStorageCurrentNamespace);
+        const cached = localStorage.getItem(`${localStoragePreStr}current-namespace`);
+        if (cached) currentNamespace.value = JSON.parse(cached);
     };
 
     return {

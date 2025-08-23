@@ -21,5 +21,8 @@ urlpatterns = [
     # anomaly detection path
     # runtime monitor
     path('api/runtime/', include('runtime_monitoring.urls')),
-    path('api/state/', include('state_manager.urls'))
+    # Alias to match tests expecting '/runtime/api/...'
+    path('runtime/api/', include('runtime_monitoring.urls')),
+    path('api/state/', include('state_manager.urls')),
+    path('api/', include('authentication.urls')),
 ]

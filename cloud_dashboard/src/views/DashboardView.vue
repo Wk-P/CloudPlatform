@@ -2,7 +2,7 @@
     <div class="dashboard-wrapper">
         <h2>Dashboard</h2>
         <p>Overview resources information</p>
-        <button class="primary-button dashboard-view" @click="windowRefresh">Refresh</button>
+    <button class="primary-button dashboard-view" @click="loadDashboard">Refresh</button>
 
         <div class="card-wrapper">
             <div class="dashboard-card card" v-for="(value, key) in sum" :key="key">
@@ -27,39 +27,41 @@
     </div>
 </template>
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import { windowRefresh } from '@/utils';
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { getResourcesInfo } from '@/utils';
 import * as echarts from 'echarts';
+import { useClusterStore } from '@/stores/cluster';
 
 // interface demo
-const sum = ref({
-    clusters: {
-        sum: 10,
-        running: 6,
-        down: 4,
-    },
-    pods: {
-        sum: 4,
-        active: 2,
-        unactive: 2,
-    },
-    nodes: {
-        sum: 5,
-        active: 3,
-        down: 2,
-    },
+const sum = ref<{ [k: string]: Record<string, number> }>({
+    clusters: { sum: 0, running: 0, down: 0 },
+    pods: { sum: 0, active: 0, unactive: 0 },
+    nodes: { sum: 0, active: 0, down: 0 },
 });
 
-const currentTime = computed(() => new Date().toTimeString());
+const clusterStore = useClusterStore();
+const currentClusterId = ref<string | null>(null);
+const loading = ref(false);
+
+// live clock
+const currentTime = ref<string>('');
+let clockTimer: number | undefined;
+
+const chartsMap: Record<string, echarts.ECharts> = {};
 
 const drawCharts = () => {
     for (const key in sum.value) {
         const chartDom = document.getElementById(`chart-${key}`);
         if (!chartDom) continue;
 
-        const resChart = echarts.init(chartDom);
+        // reuse instance if exists; otherwise init
+        let inst = echarts.getInstanceByDom(chartDom as HTMLDivElement);
+        if (!inst) {
+            inst = echarts.init(chartDom);
+            chartsMap[key] = inst;
+        }
         const data = sum.value[key as keyof typeof sum.value];
-        resChart.setOption({
+        inst.setOption({
             tooltip: {},
             xAxis: {
                 type: 'category',
@@ -117,15 +119,87 @@ const drawCharts = () => {
                 },
             ],
         });
+        inst.resize();
+    }
+};
+
+const loadDashboard = async () => {
+    if (loading.value) return;
+    loading.value = true;
+    try {
+        // 1) clusters
+        const clustersResp = await getResourcesInfo('clusters');
+        const clusters = clustersResp?.clusters || [];
+        const clustersCount = Array.isArray(clusters) ? clusters.length : 0;
+        // naive running/down: assume registered clusters are running (0 down) for now
+        sum.value.clusters = { sum: clustersCount, running: clustersCount, down: 0 };
+
+        // resolve target cluster id
+        clusterStore.loadCurrentCluster();
+        const fromStore = clusterStore.getCurrentCluster?.();
+        currentClusterId.value = fromStore?.id || (clusters[0]?.id ?? null);
+
+        if (currentClusterId.value) {
+            // 2) nodes of the cluster
+            const nodesResp = await getResourcesInfo('nodes', String(currentClusterId.value));
+            const nodes: Array<{ status?: string }> = nodesResp?.nodes || [];
+            const nodesSum = nodes.length;
+            // backend returns status string; treat 'Ready' as active
+            const nodesActive = nodes.filter((n) => (n.status || '').toLowerCase() === 'ready').length;
+            const nodesDown = Math.max(0, nodesSum - nodesActive);
+            sum.value.nodes = { sum: nodesSum, active: nodesActive, down: nodesDown };
+
+            // 3) pods of the cluster
+            const podsResp = await getResourcesInfo('pods', String(currentClusterId.value));
+            const pods: Array<{ status?: string }> = podsResp?.pods || [];
+            const podsSum = pods.length;
+            const activeStatuses = new Set(['running', 'succeeded']);
+            const podsActive = pods.filter((p) => activeStatuses.has((p.status || '').toLowerCase())).length;
+            const podsUnactive = Math.max(0, podsSum - podsActive);
+            sum.value.pods = { sum: podsSum, active: podsActive, unactive: podsUnactive };
+        } else {
+            // no clusters
+            sum.value.nodes = { sum: 0, active: 0, down: 0 };
+            sum.value.pods = { sum: 0, active: 0, unactive: 0 };
+        }
+    } catch (e) {
+        // keep zeros on error
+        console.error(e);
+    } finally {
+        loading.value = false;
+        drawCharts();
     }
 };
 
 onMounted(() => {
-    drawCharts();
+    // start clock
+    const updateClock = () => {
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        currentTime.value = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+    updateClock();
+    clockTimer = window.setInterval(updateClock, 1000);
+
+    loadDashboard();
+    // responsive
+    const onResize = () => {
+        Object.values(chartsMap).forEach((c) => c.resize());
+    };
+    window.addEventListener('resize', onResize);
+    resizeHandler = onResize;
 });
 
 watch(sum, () => {
     drawCharts();
+});
+
+let resizeHandler: (() => void) | null = null;
+
+onBeforeUnmount(() => {
+    if (clockTimer) window.clearInterval(clockTimer);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    Object.values(chartsMap).forEach((c) => c.dispose());
 });
 </script>
 <style scoped>
@@ -136,7 +210,7 @@ watch(sum, () => {
     justify-content: space-evenly;
 }
 .dashboard-card {
-    width: 80%;
+    width: 90%;
     margin: 2rem;
 }
 
@@ -145,7 +219,7 @@ watch(sum, () => {
 }
 
 .dashboard-card .card-body {
-    height: 500px;
+    min-height: 360px;
     display: flex;
     flex-direction: column;
     align-items: center;

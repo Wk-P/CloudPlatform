@@ -21,7 +21,7 @@ export interface Node {
 export interface Namespace {
     id: string;
     name: string;
-    nanmespace_id: string;
+    namespace_id?: string;
 }
 
 // ClusterView

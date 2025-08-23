@@ -26,11 +26,22 @@ import { useRouter } from 'vue-router';
 const form = ref({ username: '', password: '' });
 const router = useRouter();
 
-const handleLogin = () => {
-    if (form.value.username && form.value.password) {
-        router.push('/dashboard');
-    } else {
-        alert('Please enter password');
+const handleLogin = async () => {
+    try {
+        const resp = await fetch('/api/auth/jwt/issue/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: form.value.username || 'anonymous' }),
+        });
+        const data = await resp.json();
+        if (data?.token) {
+            localStorage.setItem('cloud-dashboard-token', data.token);
+            router.push('/dashboard');
+        } else {
+            alert('Login failed');
+        }
+    } catch {
+        alert('Login failed');
     }
 };
 </script>

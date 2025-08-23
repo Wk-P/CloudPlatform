@@ -19,7 +19,7 @@ class ClusterUsageTest(TestCase):
 
         factory = RequestFactory()
         request = factory.get("/fake-url")
-        response = get_cluster_usage(request, cluster)
+        response = get_cluster_usage(request, cluster.id)
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.content)

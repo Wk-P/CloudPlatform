@@ -63,7 +63,21 @@ const router = createRouter({
             name: 'login',
             component: () => import('@/views/LoginView.vue'),
         },
+        {
+            path: '/register',
+            name: 'register',
+            component: () => import('@/views/RegisterView.vue'),
+        },
     ],
 });
 
 export default router;
+
+// Global auth guard: redirect to /login when no platform token
+router.beforeEach((to, _from, next) => {
+    const publicNames = new Set(['login', 'register']);
+    if (publicNames.has(to.name as string)) return next();
+    const token = localStorage.getItem('cloud-dashboard-token') || sessionStorage.getItem('cloud-dashboard-token');
+    if (!token) return next({ name: 'login', query: { redirect: to.fullPath } });
+    next();
+});

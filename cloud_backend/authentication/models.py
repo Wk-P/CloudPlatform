@@ -5,8 +5,8 @@ import uuid
 
 class K8sAccount(models.Model):
     user = models.ForeignKey('ManagerCustomUser', on_delete=models.CASCADE, related_name='k8s_accounts')
+    cluster = models.ForeignKey('runtime_monitoring.KubeCluster', on_delete=models.CASCADE, related_name='accounts', null=True, blank=True)
     cluster_name = models.CharField(max_length=100)
-    cluster_id = models.TextField(blank=True, null=True)
     kubeconfig = models.TextField()
     token = models.TextField(blank=True, null=True)
     token_expire_time = models.DateTimeField(blank=True, null=True)

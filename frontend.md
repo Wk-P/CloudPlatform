@@ -7,6 +7,17 @@
 <br>
 
 # 前端开发日志
+## 2025年8月24日
+- 全局认证与导航
+	- 新增 fetchWithAuth 封装：统一附带 Authorization，遇到 401 仅清除平台 JWT 并重定向到 /login?redirect=<当前路径>；支持从 localStorage 与 sessionStorage 读取平台 JWT。
+	- 路由守卫：未登录访问任何非登录/注册页面时，统一跳转登录；登录成功后按 redirect 返回原页面。
+- ClustersView
+	- 新增“绑定 SA”对话框（命名空间 + Token）；本地解码 SA JWT exp 并显示 Valid/Expired；401 时提示重新登录。
+- 工具库（src/utils/index.ts）
+	- 将 registerNewCluster/getResourcesInfo/getNamespaces/postCommand/bindClusterSaToken 等 API 切换到 fetchWithAuth；统一错误返回结构（含 ok/status/message）。
+- 其它
+	- 修复 Headers 合并的类型问题，TypeScript 校验通过。
+
 ## 2025年8月23日
 - Commands Console（CommandsView.vue）
 	- 表单扩展：新增动作 apply/delete/scale；按动作展示对应输入项（manifest、kind/name、replicas 等）。

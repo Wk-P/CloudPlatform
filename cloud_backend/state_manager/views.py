@@ -17,14 +17,14 @@ try:
     import yaml  # optional, for YAML manifests
 except Exception:  # pragma: no cover
     yaml = None
-from authentication.jwt_utils import jwt_required
+from authentication.jwt_utils import jwt_required, jwt_decode
 from django.conf import settings
 
 
 ALLOWED_ACTIONS = {"get", "describe", "logs", "apply", "delete", "scale"}
 
 
-def _configure_k8s(cluster: KubeCluster):
+def _configure_k8s(cluster: KubeCluster, token: str):
     configuration = client.Configuration()
     configuration.host = f"https://{cluster.api_server}:{cluster.port}"
     tls = getattr(settings, 'K8S_TLS', {}) or {}
@@ -33,7 +33,7 @@ def _configure_k8s(cluster: KubeCluster):
     ca = tls.get('CA_CERT')
     if verify and ca:
         configuration.ssl_ca_cert = ca
-    configuration.api_key = {"authorization": "Bearer " + cluster.token}
+    configuration.api_key = {"authorization": "Bearer " + token}
     client.Configuration.set_default(configuration)
 
 
@@ -76,7 +76,7 @@ def run_command(request):
         if action == "scale" and resource and resource != "deployments":
             return JsonResponse({"error": "scale only supports resource 'deployments'"}, status=400)
 
-        # resolve cluster by numeric id or by cluster_id field
+    # resolve cluster by numeric id or by cluster_id field
         cluster = None
         try:
             if isinstance(cluster_id, int) or (isinstance(cluster_id, str) and str(cluster_id).isdigit()):
@@ -94,7 +94,30 @@ def run_command(request):
             user=getattr(request, 'user', None) if getattr(request, 'user', None) and request.user.is_authenticated else None,
         )
 
-        _configure_k8s(cluster)
+        # resolve SA token bound to this cluster for current user
+        def _get_sa_token(req, cluster_obj: KubeCluster):
+            auth = req.headers.get('Authorization') or req.META.get('HTTP_AUTHORIZATION')
+            if not auth or not auth.startswith('Bearer '):
+                return None, JsonResponse({'error': 'Unauthorized'}, status=401)
+            token_jwt = auth.split(' ', 1)[1]
+            try:
+                payload = jwt_decode(token_jwt)
+                from authentication.models import ManagerCustomUser, K8sAccount
+                user = ManagerCustomUser.objects.get(uuid=payload.get('sub'))
+            except Exception:
+                return None, JsonResponse({'error': 'Unauthorized'}, status=401)
+            try:
+                acc = K8sAccount.objects.filter(user=user, cluster=cluster_obj).order_by('-id').first()
+            except Exception:
+                acc = None
+            if not acc or not acc.token:
+                return None, JsonResponse({'error': 'No SA token bound for this cluster'}, status=400)
+            return acc.token, None
+
+        sa_token, err = _get_sa_token(request, cluster)
+        if err:
+            return err
+        _configure_k8s(cluster, sa_token)
 
         stdout = ""
         stderr = ""
@@ -345,13 +368,36 @@ def run_command(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+@jwt_required
 def get_cluster_usage(request, id: int):
     """Get cluster usage by cluster primary key id."""
     cluster = get_object_or_404(KubeCluster, id=id)
+    # resolve SA token bound to this cluster for current user
+    auth = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION')
+    if not auth or not auth.startswith('Bearer '):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    try:
+        payload = jwt_decode(auth.split(' ', 1)[1])
+        from authentication.models import ManagerCustomUser, K8sAccount
+        user = ManagerCustomUser.objects.get(uuid=payload.get('sub'))
+    except Exception:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    acc = None
+    try:
+        acc = K8sAccount.objects.filter(user=user, cluster=cluster).order_by('-id').first()
+    except Exception:
+        acc = None
+    if not acc or not acc.token:
+        return JsonResponse({'error': 'No SA token bound for this cluster'}, status=400)
     configuration = client.Configuration()
     configuration.host = f"https://{cluster.api_server}:{cluster.port}"
-    configuration.verify_ssl = False
-    configuration.api_key = {"authorization": "Bearer " + cluster.token}
+    tls = getattr(settings, 'K8S_TLS', {}) or {}
+    verify = tls.get('VERIFY_SSL', False)
+    configuration.verify_ssl = verify
+    ca = tls.get('CA_CERT')
+    if verify and ca:
+        configuration.ssl_ca_cert = ca
+    configuration.api_key = {"authorization": "Bearer " + acc.token}
     client.Configuration.set_default(configuration)
 
     v1 = client.CoreV1Api()
@@ -398,12 +444,35 @@ def get_cluster_usage(request, id: int):
     })
 
 
+@jwt_required
 def get_node_usage(request, id, node_name):
     cluster = get_object_or_404(KubeCluster, id=id)
+    # resolve SA token bound to this cluster for current user
+    auth = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION')
+    if not auth or not auth.startswith('Bearer '):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    try:
+        payload = jwt_decode(auth.split(' ', 1)[1])
+        from authentication.models import ManagerCustomUser, K8sAccount
+        user = ManagerCustomUser.objects.get(uuid=payload.get('sub'))
+    except Exception:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    acc = None
+    try:
+        acc = K8sAccount.objects.filter(user=user, cluster=cluster).order_by('-id').first()
+    except Exception:
+        acc = None
+    if not acc or not acc.token:
+        return JsonResponse({'error': 'No SA token bound for this cluster'}, status=400)
     configuration = client.Configuration()
     configuration.host = f"https://{cluster.api_server}:{cluster.port}"
-    configuration.verify_ssl = False
-    configuration.api_key = {"authorization": "Bearer " + cluster.token}
+    tls = getattr(settings, 'K8S_TLS', {}) or {}
+    verify = tls.get('VERIFY_SSL', False)
+    configuration.verify_ssl = verify
+    ca = tls.get('CA_CERT')
+    if verify and ca:
+        configuration.ssl_ca_cert = ca
+    configuration.api_key = {"authorization": "Bearer " + acc.token}
     client.Configuration.set_default(configuration)
 
     v1 = client.CoreV1Api()

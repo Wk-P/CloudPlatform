@@ -62,6 +62,16 @@ Django (Version 5.1.7)
 
 
 # 后端开发日志 Backend Development Log 
+## 2025-08-24
+- 认证与会话
+    - 保持平台 JWT 与 Kubernetes SA Token 的职责分离；新增前端 401 统一处理策略后，后端接口行为未变更：平台 JWT 失效返回 401，业务错误按 4xx/5xx 分类。
+- SA 绑定与多集群
+    - 已提供 /api/auth/k8s/account/bind/ 接口用于为当前用户与指定集群绑定/更新 SA Token；其余运行时/状态查询均从用户-集群维度解析 SA。
+- 运行时与命令
+    - 继续沿用动态客户端执行 apply/delete/scale；输入校验与错误抛出维持昨日逻辑，便于前端进行统一错误展示。
+- 运维
+    - 修正测试 token.json 的格式与有效期以便联调；数据库模型维持 K8sAccount 绑定（user+cluster）。
+
 ## 2025-08-23
 - Kubernetes 高级指令支持（state_manager.views.run_command）
     - 新增 actions: apply、delete、scale；使用 DynamicClient 执行 Server-Side Apply（apply-patch+yaml），失败回退 create；delete 支持 kind/resource 映射与命名空间/集群作用域判断；scale 通过 AppsV1Api patch Scale。

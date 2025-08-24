@@ -51,14 +51,16 @@
             <div v-if="result">
                 <!-- Basic meta -->
                 <table class="result-table meta">
-                    <tr>
-                        <th class="item-head">command</th>
-                        <td class="item-body cmd">{{ result.cmd }}</td>
-                    </tr>
-                    <tr>
-                        <th class="item-head">status</th>
-                        <td class="item-body">{{ result.cmd_status }} (code: {{ result.status_code }})</td>
-                    </tr>
+                    <tbody>
+                        <tr>
+                            <th class="item-head">command</th>
+                            <td class="item-body cmd">{{ result.cmd }}</td>
+                        </tr>
+                        <tr>
+                            <th class="item-head">status</th>
+                            <td class="item-body">{{ result.cmd_status }} (code: {{ result.status_code }})</td>
+                        </tr>
+                    </tbody>
                 </table>
 
                 <!-- Parsed/structured output -->
@@ -181,9 +183,10 @@
 </template>
 
 <script setup lang="ts">
-import type { CommandResult } from '@/interfaces';
+import type { CommandResult, Cluster } from '@/interfaces';
 import { postCommand, type CommandPayload } from '@/utils';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
+import { useClusterStore } from '@/stores/cluster';
 
 const action = ref<'get'|'describe'|'logs'|'apply'|'delete'|'scale'>('get');
 const resource = ref<'pods'|'services'|'deployments'>('pods');
@@ -199,7 +202,10 @@ const lastAction = ref<typeof action.value>('get');
 const lastResource = ref<typeof resource.value>('pods');
 
 const executeCommand = async () => {
-    if (!clusterId.value) return;
+    if (!clusterId.value) {
+        alert('Please input cluster id');
+        return;
+    }
     lastAction.value = action.value;
     lastResource.value = resource.value;
     let payload: CommandPayload;
@@ -275,6 +281,19 @@ const executeCommand = async () => {
 
     result.value = await postCommand(payload);
 };
+
+onMounted(() => {
+    try {
+        const raw = useClusterStore() as unknown as {
+            getCurrentCluster?: () => Cluster | null | undefined;
+            currentCluster?: Cluster | null | undefined;
+        };
+        const c = typeof raw.getCurrentCluster === 'function' ? raw.getCurrentCluster() : raw.currentCluster;
+        if (c?.id && !clusterId.value) clusterId.value = String(c.id);
+    } catch {
+        // ignore
+    }
+});
 
 type Dict = Record<string, unknown>;
 type Parsed =
@@ -393,6 +412,10 @@ function tryExtractFromJson() {
     font-weight: 600;
     color: rgb(38, 38, 232);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+summary {
+    cursor: pointer;
 }
 
 .section { margin-top: 1rem; }

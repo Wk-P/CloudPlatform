@@ -9,7 +9,7 @@ from django.utils import timezone
 import json
 import uuid
 from django.conf import settings
-from authentication.jwt_utils import jwt_required
+from authentication.jwt_utils import jwt_required, jwt_decode
 
 def get_clusters_base_info_list(request):
     results = list(KubeCluster.objects.all().values())
@@ -19,7 +19,10 @@ def get_clusters_base_info_list(request):
 
 def get_cluster_info(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    core = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    core = get_core_client(cluster.api_server, cluster.port, token)
 
     try:
         services = core.list_namespaced_service("kube-system")
@@ -59,27 +62,21 @@ def add_cluster_simple(request):
             body = request.POST.dict() if hasattr(request, "POST") else {}
 
         api_server = body.get("api_server")
-        token = body.get("token")
+        # optional: verification is skipped; SA will be bound per-cluster separately
         # port may come as str; default to 8443
         try:
             port = int(body.get("port", 8443))
         except Exception:
             port = 8443
         name = body.get('name') or "auto"
+        sa_token = (body.get('sa_token') or '').strip()
+        namespace = (body.get('namespace') or 'default').strip() or 'default'
 
         # basic validation
-        if not api_server or not token:
-            return JsonResponse({"error": "api_server and token are required"}, status=400)
+        if not api_server:
+            return JsonResponse({"error": "api_server is required"}, status=400)
 
-        # verify connection
-        configuration = client.Configuration()
-        configuration.host = f"https://{api_server}:{port}"
-        configuration.verify_ssl = False
-        configuration.api_key = {"authorization": "Bearer " + token}
-        client.Configuration.set_default(configuration)
-
-        version_api = client.VersionApi()
-        version_info = version_api.get_code()
+        version_info = None
 
         # auto name generate
         name = f"k8s-cluster-{name}"
@@ -88,10 +85,40 @@ def add_cluster_simple(request):
             name=name,
             api_server=api_server,
             port=port,
-            token=token,
             description=f"Auto register {timezone.now()}",
             cluster_id=str(uuid.uuid4())
         )
+
+        # Bind SA token to this cluster for current user (required)
+        if not sa_token:
+            return JsonResponse({"error": "sa_token is required to bind ServiceAccount for this cluster"}, status=400)
+        # decode current user from JWT
+        auth = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION')
+        if not auth or not auth.startswith('Bearer '):
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        try:
+            payload = jwt_decode(auth.split(' ', 1)[1])
+            from authentication.models import ManagerCustomUser, K8sAccount
+            user = ManagerCustomUser.objects.get(uuid=payload.get('sub'))
+        except Exception:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        # create account binding
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                K8sAccount.objects.create(
+                    user=user,
+                    cluster=cluster,
+                    cluster_name=cluster.name,
+                    kubeconfig='',
+                    token=sa_token,
+                    token_expire_time=None,
+                    user_group=None,
+                    namespace=namespace or 'default',
+                    k8s_api_server_url=f"https://{cluster.api_server}:{cluster.port}",
+                )
+        except Exception as ex:
+            return JsonResponse({"error": f"Failed to bind SA token: {ex}"}, status=400)
 
         return JsonResponse({
             "message": "Cluster Add Success",
@@ -111,7 +138,10 @@ def add_cluster_simple(request):
 
 def get_nodes(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    v1 = get_core_client(cluster.api_server, cluster.port, token)
 
     try:
         nodes = v1.list_node()
@@ -126,7 +156,10 @@ def get_nodes(request, id):
 
 def get_pods(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    v1 = get_core_client(cluster.api_server, cluster.port, token)
 
     try:
         # filters
@@ -173,7 +206,10 @@ def get_pods(request, id):
     
 def get_services(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    v1 = get_core_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         label_selector = request.GET.get('labelSelector')
@@ -190,7 +226,10 @@ def get_services(request, id):
 
 def get_events(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    v1 = get_core_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         events = v1.list_namespaced_event(ns) if ns else v1.list_event_for_all_namespaces()
@@ -205,7 +244,10 @@ from .kube_client import get_apps_client, get_batch_client, get_autoscaling_clie
 
 def get_jobs(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    batch = get_batch_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    batch = get_batch_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         jobs = batch.list_namespaced_job(ns) if ns else batch.list_job_for_all_namespaces()
@@ -216,7 +258,10 @@ def get_jobs(request, id):
     
 def get_deployments(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    apps_v1 = get_apps_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         label_selector = request.GET.get('labelSelector')
@@ -243,7 +288,10 @@ def get_deployments(request, id):
     
 def get_daemonsets(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    apps_v1 = get_apps_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         daemonsets = (
@@ -266,7 +314,10 @@ def get_daemonsets(request, id):
 
 def get_statefulsets(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    apps_v1 = get_apps_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         statefulsets = (
@@ -288,7 +339,10 @@ def get_statefulsets(request, id):
     
 def get_replicasets(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    apps_v1 = get_apps_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    apps_v1 = get_apps_client(cluster.api_server, cluster.port, token)
     try:
         ns = request.GET.get('namespace')
         replicasets = (
@@ -311,10 +365,38 @@ def get_replicasets(request, id):
 
 def get_namespaces(request, id):
     cluster = get_object_or_404(KubeCluster, id=id)
-    v1 = get_core_client(cluster.api_server, cluster.port, cluster.token)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    v1 = get_core_client(cluster.api_server, cluster.port, token)
     try:
         nss = v1.list_namespace()
         data = [{"name": ns.metadata.name, "status": getattr(ns.status, 'phase', None)} for ns in nss.items]
         return JsonResponse({"namespaces": data})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def _get_sa_token(request, cluster):
+    auth = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION')
+    if not auth or not auth.startswith('Bearer '):
+        return None, JsonResponse({'error': 'Unauthorized'}, status=401)
+    token = auth.split(' ', 1)[1]
+    try:
+        payload = jwt_decode(token)
+    except Exception as e:
+        return None, JsonResponse({'error': f'Invalid token: {e}'}, status=401)
+    try:
+        from authentication.models import ManagerCustomUser
+        user = ManagerCustomUser.objects.get(uuid=payload.get('sub'))
+    except Exception:
+        return None, JsonResponse({'error': 'User not found'}, status=404)
+    # find K8sAccount bound to this cluster
+    try:
+        from authentication.models import K8sAccount
+        acc = K8sAccount.objects.filter(user=user, cluster=cluster).order_by('-id').first()
+    except Exception:
+        acc = None
+    if not acc or not acc.token:
+        return None, JsonResponse({'error': 'No SA token bound for this cluster'}, status=400)
+    return acc.token, None

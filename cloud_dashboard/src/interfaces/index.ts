@@ -33,14 +33,14 @@ export interface Cluster {
     nodes: Node[];
     namespace: Namespace[];
     cluster_id: string;
-    token: string;
 }
 
 export interface NewClusterParams {
     api_server: string;
     name: string;
     port: string;
-    token: string;
+    namespace?: string;
+    sa_token?: string;
 }
 
 // CommandView

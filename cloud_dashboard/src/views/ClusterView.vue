@@ -3,6 +3,12 @@
         <div class="toolbar">
             <button class="primary-button cluster-detail" @click="backToClusters">Back</button>
             <h2>Cluster {{ clusterId }} Details</h2>
+            <div class="id-box">
+                <span>ID: <code class="mono">{{ clusterId }}</code></span>
+                <span v-if="clusterStore.currentCluster?.cluster_id">UUID: <code class="mono">{{ clusterStore.currentCluster?.cluster_id }}</code></span>
+                <button class="secondary-small-button" @click="copyToClipboard(clusterId)">Copy ID</button>
+                <button v-if="clusterStore.currentCluster?.cluster_id" class="secondary-small-button" @click="copyToClipboard(clusterStore.currentCluster!.cluster_id)">Copy UUID</button>
+            </div>
             <div class="spacer" />
             <label>
                 Namespace:
@@ -230,6 +236,13 @@ onUnmounted(() => {
 const backToClusters = () => {
     router.push({ name: 'clusters' });
 };
+
+function copyToClipboard(text: string) {
+    if (!text) return;
+    navigator.clipboard?.writeText(String(text)).then(() => {
+        // no-op
+    });
+}
 </script>
 
 <style scoped>
@@ -256,4 +269,6 @@ const backToClusters = () => {
 .status.ok { color: #2ecc71; font-weight: 600; }
 .status.warn { color: #e67e22; font-weight: 600; }
 .primary-button.cluster-detail { margin-left: 0; }
+.id-box { display: flex; align-items: center; gap: 0.5rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 </style>

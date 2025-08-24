@@ -7,7 +7,6 @@ class KubeCluster(models.Model):
     name = models.CharField(max_length=100, help_text="Cluster Name")
     api_server = models.GenericIPAddressField(help_text="Cluster API Server address, e.g 192.168.0.247")
     port = models.IntegerField(default=6443, help_text="API Server port, e.g 6443")
-    token = models.TextField(help_text="Bearer Token, for visit Cluster")
     description = models.TextField(blank=True, help_text="More")
     cluster_id = models.CharField(max_length=100, help_text="Cluster ID", blank=True)
 

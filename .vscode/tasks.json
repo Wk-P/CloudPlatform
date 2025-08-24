@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+            "label": "frontend: pnpm dev",
+            "type": "shell",
+            "command": "pnpm",
+            "args": [
+                "dev"
+            ],
+            "options": {
+                "cwd": "d:\\github\\CloudPlatform\\cloud_dashboard"
+            },
+            "group": "build",
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "backend: venv + runserver",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "& { & 'd:\\github\\CloudPlatform\\.venv\\Scripts\\Activate.ps1'; Set-Location 'd:\\github\\CloudPlatform\\cloud_backend'; python .\\manage.py runserver }"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "dev: start all",
+            "type": "shell",
+            "command": "echo",
+            "args": [
+                "Starting frontend and backend..."
+            ],
+            "dependsOn": [
+                "frontend: pnpm dev",
+                "backend: venv + runserver"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

@@ -12,9 +12,22 @@ from django.conf import settings
 from authentication.jwt_utils import jwt_required, jwt_decode
 
 def get_clusters_base_info_list(request):
+
     results = list(KubeCluster.objects.all().values())
 
-    return JsonResponse({"clusters": results})
+    # 假设后端实际集群列表通过某种方式获取，这里用伪代码
+    # 请根据你的实际环境实现 get_actual_backend_clusters()
+    def get_actual_backend_clusters():
+        # TODO: 替换为实际后端集群获取逻辑
+        return []
+
+    backend_clusters = get_actual_backend_clusters()
+    db_set = set((c['name'], c['api_server'], c['port']) for c in results)
+    backend_set = set((c['name'], c['api_server'], c['port']) for c in backend_clusters)
+    resp = {"clusters": results}
+    if db_set != backend_set:
+        resp["warning"] = "后端集群与数据库不一致，请检查配置或同步！"
+    return JsonResponse(resp)
 
 
 def get_cluster_info(request, id):
@@ -218,7 +231,36 @@ def get_services(request, id):
             list_kwargs['label_selector'] = label_selector
 
         services = v1.list_namespaced_service(ns, **list_kwargs) if ns else v1.list_service_for_all_namespaces(**list_kwargs)
-        data = [{"name": s.metadata.name, "namespace": s.metadata.namespace} for s in services.items]
+        data = []
+        for s in services.items:
+            ports = []
+            try:
+                for p in (s.spec.ports or []):
+                    ports.append({
+                        "port": getattr(p, 'port', None),
+                        "target_port": getattr(p, 'target_port', None),
+                        "protocol": getattr(p, 'protocol', None)
+                    })
+            except Exception:
+                ports = []
+            lb_ips = []
+            try:
+                ing = getattr(s.status, 'load_balancer', None)
+                if ing and getattr(ing, 'ingress', None):
+                    for i in (ing.ingress or []):
+                        ip = getattr(i, 'ip', None) or getattr(i, 'hostname', None)
+                        if ip:
+                            lb_ips.append(ip)
+            except Exception:
+                lb_ips = []
+            data.append({
+                "name": s.metadata.name,
+                "namespace": s.metadata.namespace,
+                "type": getattr(s.spec, 'type', None),
+                "cluster_ip": getattr(s.spec, 'cluster_ip', None) or getattr(s.spec, 'clusterIPs', None),
+                "ports": ports,
+                "load_balancer": lb_ips,
+            })
         return JsonResponse({"services": data})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -253,6 +295,114 @@ def get_jobs(request, id):
         jobs = batch.list_namespaced_job(ns) if ns else batch.list_job_for_all_namespaces()
         data = [{"name": j.metadata.name} for j in jobs.items]
         return JsonResponse({"jobs": data})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+def get_ingresses(request, id):
+    cluster = get_object_or_404(KubeCluster, id=id)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    net = get_networking_client(cluster.api_server, cluster.port, token)
+    try:
+        ns = request.GET.get('namespace')
+        label_selector = request.GET.get('labelSelector')
+        list_kwargs = {}
+        if label_selector:
+            list_kwargs['label_selector'] = label_selector
+        ings = net.list_namespaced_ingress(ns, **list_kwargs) if ns else net.list_ingress_for_all_namespaces(**list_kwargs)
+        data = []
+        for ing in ings.items:
+            rules = []
+            try:
+                for r in (ing.spec.rules or []):
+                    host = getattr(r, 'host', None)
+                    paths = []
+                    http = getattr(r, 'http', None)
+                    if http and getattr(http, 'paths', None):
+                        for p in http.paths:
+                            backend = getattr(p, 'backend', None)
+                            svc_name = None
+                            svc_port = None
+                            if backend and getattr(backend, 'service', None):
+                                svc = backend.service
+                                svc_name = getattr(svc, 'name', None)
+                                prt = getattr(svc, 'port', None)
+                                svc_port = getattr(prt, 'number', None) or getattr(prt, 'name', None)
+                            paths.append({
+                                "path": getattr(p, 'path', None),
+                                "path_type": getattr(p, 'path_type', None),
+                                "service": svc_name,
+                                "service_port": svc_port,
+                            })
+                    rules.append({"host": host, "paths": paths})
+            except Exception:
+                rules = []
+            lb = getattr(getattr(ing.status, 'load_balancer', None), 'ingress', None) or []
+            lb_addrs = []
+            try:
+                for i in lb:
+                    addr = getattr(i, 'ip', None) or getattr(i, 'hostname', None)
+                    if addr:
+                        lb_addrs.append(addr)
+            except Exception:
+                lb_addrs = []
+            data.append({
+                "namespace": ing.metadata.namespace,
+                "name": ing.metadata.name,
+                "rules": rules,
+                "load_balancer": lb_addrs,
+            })
+        return JsonResponse({"ingresses": data})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+def get_hpas(request, id):
+    cluster = get_object_or_404(KubeCluster, id=id)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    autos = get_autoscaling_client(cluster.api_server, cluster.port, token)
+    try:
+        ns = request.GET.get('namespace')
+        hpas = autos.list_namespaced_horizontal_pod_autoscaler(ns) if ns else autos.list_horizontal_pod_autoscaler_for_all_namespaces()
+        data = []
+        for h in hpas.items:
+            data.append({
+                "namespace": h.metadata.namespace,
+                "name": h.metadata.name,
+                "min": getattr(h.spec, 'min_replicas', None),
+                "max": getattr(h.spec, 'max_replicas', None),
+                "current": getattr(getattr(h.status, 'current_replicas', None), 'value', None) or getattr(h.status, 'current_replicas', None)
+            })
+        return JsonResponse({"hpas": data})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+def get_cronjobs(request, id):
+    cluster = get_object_or_404(KubeCluster, id=id)
+    token, err = _get_sa_token(request, cluster)
+    if err:
+        return err
+    batch = get_batch_client(cluster.api_server, cluster.port, token)
+    try:
+        ns = request.GET.get('namespace')
+        cjs = batch.list_namespaced_cron_job(ns) if ns else batch.list_cron_job_for_all_namespaces()
+        data = []
+        for cj in cjs.items:
+            last_scheduled = None
+            try:
+                last_scheduled = getattr(getattr(cj.status, 'last_schedule_time', None), 'isoformat', lambda: None)()
+            except Exception:
+                last_scheduled = None
+            data.append({
+                "namespace": cj.metadata.namespace,
+                "name": cj.metadata.name,
+                "schedule": getattr(getattr(cj.spec, 'schedule', None), 'value', None) or getattr(cj.spec, 'schedule', None),
+                "active": len(getattr(cj.status, 'active', []) or []),
+                "last_schedule_time": last_scheduled,
+            })
+        return JsonResponse({"cronjobs": data})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     

@@ -72,6 +72,16 @@ Django (Version 5.1.7)
 - 运维
     - 修正测试 token.json 的格式与有效期以便联调；数据库模型维持 K8sAccount 绑定（user+cluster）。
 
+## 2025-08-25
+- 异常检测（Zeek）
+    - 新增后端模型：ZeekConfig（默认配置存储）、ZeekAgentStatus（Agent 心跳/状态）。
+    - 新增接口：
+        - GET/POST /api/anomaly/zeek/config/（获取/更新默认配置）。
+        - GET /api/anomaly/zeek/status/（查看最近 Agent 状态）。
+        - POST /api/anomaly/zeek/heartbeat/（Agent 心跳上报）。
+    - 路由接入：/api/ 前缀下挂载 anomaly_detection.urls。
+    - 迁移：需要执行 makemigrations/migrate 以创建新表。
+
 ## 2025-08-23
 - Kubernetes 高级指令支持（state_manager.views.run_command）
     - 新增 actions: apply、delete、scale；使用 DynamicClient 执行 Server-Side Apply（apply-patch+yaml），失败回退 create；delete 支持 kind/resource 映射与命名空间/集群作用域判断；scale 通过 AppsV1Api patch Scale。

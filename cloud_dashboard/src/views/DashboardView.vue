@@ -2,7 +2,9 @@
     <div class="dashboard-wrapper">
         <h2>Dashboard</h2>
         <p>Overview resources information</p>
-    <button class="primary-button dashboard-view" @click="loadDashboard">Refresh</button>
+        <div class="action-bar">
+            <button class="primary-button" @click="loadDashboard">Refresh</button>
+        </div>
 
         <div class="card-wrapper">
             <div class="dashboard-card card" v-for="(value, key) in sum" :key="key">
@@ -162,14 +164,38 @@ const loadDashboard = async () => {
             sum.value.nodes = { sum: 0, active: 0, down: 0 };
             sum.value.pods = { sum: 0, active: 0, unactive: 0 };
         }
-    } catch (e) {
-        // keep zeros on error
+    } catch (e: unknown) {
         console.error(e);
+        let status = 0;
+        // axios error
+        if (typeof e === 'object' && e !== null) {
+            // axios: { response: { status: number } }
+            if ('response' in e && typeof (e as { response?: { status?: number } }).response?.status === 'number') {
+                status = (e as { response: { status: number} }).response.status;
+            }
+            // fetch: { status: number }
+            else if ('status' in e && typeof (e as { status?: number }).status === 'number') {
+                status = (e as { status: number }).status;
+            }
+            // backend custom error: { error: string }
+            else if ('error' in e && typeof (e as { error?: string }).error === 'string') {
+                if ((e as { error: string }).error.includes('500')) status = 500;
+            }
+        }
+        if (status === 500) {
+            if (typeof window !== 'undefined' && 'ElMessage' in window && typeof window.ElMessage === 'function') {
+                window.ElMessage('Internal Server Error (500)', { type: 'error' });
+            } else {
+                alert('Internal Server Error (500)');
+            }
+        }
     } finally {
         loading.value = false;
         drawCharts();
     }
 };
+
+
 
 onMounted(() => {
     // start clock
@@ -240,5 +266,21 @@ onBeforeUnmount(() => {
 
 .primary-button.dashboard-view {
     margin-left: 0;
+}
+.action-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.danger-button {
+    background-color: #e03e2f;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.danger-button:hover {
+    background-color: #c73527;
 }
 </style>

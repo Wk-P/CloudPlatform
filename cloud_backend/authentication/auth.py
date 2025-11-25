@@ -17,10 +17,10 @@ def load_test_token():
         try:
             data = json.load(f)
         except json.JSONDecodeError:
-            raise RuntimeError("token.json 无法解析为 JSON。")
+            raise RuntimeError("token.json can not parse to JSON.")
     
     if not isinstance(data, list):
-        raise RuntimeError("token.json 格式错误，应该是列表。")
+        raise RuntimeError("token.json format error, it should be a list.")
     
     valid_tokens = []
     for item in data:

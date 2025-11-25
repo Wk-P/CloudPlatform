@@ -25,6 +25,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormInstance } from 'element-plus';
+import { URLs } from '@/urls';
 
 const router = useRouter();
 const formRef = ref<FormInstance>();
@@ -63,7 +64,7 @@ const submit = async () => {
     loading.value = true;
     try {
         // 1) register account
-        const reg = await fetch('/api/auth/register/', {
+        const reg = await fetch(URLs.AUTH_REGISTER, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

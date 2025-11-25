@@ -1,27 +1,47 @@
 <template>
     <div class="cluster-view">
         <div class="toolbar">
-            <button class="primary-button cluster-detail" @click="backToClusters">Back</button>
-            <h2>Cluster {{ clusterId }} Details</h2>
-            <div class="id-box">
-                <span>ID: <code class="mono">{{ clusterId }}</code></span>
-                <span v-if="clusterStore.currentCluster?.cluster_id">UUID: <code class="mono">{{ clusterStore.currentCluster?.cluster_id }}</code></span>
-                <button class="secondary-small-button" @click="copyToClipboard(clusterId)">Copy ID</button>
-                <button v-if="clusterStore.currentCluster?.cluster_id" class="secondary-small-button" @click="copyToClipboard(clusterStore.currentCluster!.cluster_id)">Copy UUID</button>
+            <div class="head-title">
+                <button class="primary-button cluster-detail" @click="backToClusters">Back</button>
+                <h2>Cluster {{ clusterId }} Details</h2>
+                <div class="id-box">
+                    <span
+                        >ID: <code class="mono">{{ clusterId }}</code></span
+                    >
+                    <span v-if="clusterStore.currentCluster?.cluster_id"
+                        >UUID: <code class="mono">{{ clusterStore.currentCluster?.cluster_id }}</code></span
+                    >
+                    <button class="secondary-small-button primary-small-button" @click="copyToClipboard(clusterId)">
+                        Copy ID
+                    </button>
+                    <button
+                        v-if="clusterStore.currentCluster?.cluster_id"
+                        class="secondary-small-button primary-small-button"
+                        @click="copyToClipboard(clusterStore.currentCluster!.cluster_id)"
+                    >
+                        Copy UUID
+                    </button>
+                </div>
             </div>
-            <div class="spacer" />
-            <label>
-                Namespace:
-                <select v-model="filters.namespace" @change="reloadPodsAndDeployments">
-                    <option value="">All</option>
-                    <option v-for="ns in namespaces" :key="ns.name" :value="ns.name">{{ ns.name }}</option>
-                </select>
-            </label>
-            <label>
-                Label:
-                <input class="default-input" v-model="filters.labelSelector" placeholder="key=value" @keyup.enter="reloadPodsAndDeployments" />
-            </label>
-            <button class="primary-small-button" @click="reloadAll">Refresh</button>
+            <div class="spacer">
+                <label>
+                    Namespace:
+                    <select v-model="filters.namespace" @change="reloadPodsAndDeployments">
+                        <option value="">All</option>
+                        <option v-for="ns in namespaces" :key="ns.name" :value="ns.name">{{ ns.name }}</option>
+                    </select>
+                </label>
+                <label>
+                    Label:
+                    <input
+                        class="default-input"
+                        v-model="filters.labelSelector"
+                        placeholder="key=value"
+                        @keyup.enter="reloadPodsAndDeployments"
+                    />
+                </label>
+                <button class="primary-small-button" @click="reloadAll">Refresh</button>
+            </div>
         </div>
 
         <div class="content">
@@ -39,7 +59,9 @@
                             <tr v-for="n in nodes" :key="n.name">
                                 <td>{{ n.name }}</td>
                                 <td>
-                                    <span :class="['status', (n.status || '').toLowerCase()==='ready' ? 'ok' : 'warn']">{{ n.status }}</span>
+                                    <span :class="['status', (n.status || '').toLowerCase() === 'ready' ? 'ok' : 'warn']">{{
+                                        n.status
+                                    }}</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -67,6 +89,44 @@
                                 <td>{{ p.node }}</td>
                                 <td>{{ p.restarts }}</td>
                                 <td>{{ p.created_at }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel">
+                    <h3>Services</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Namespace</th>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="s in services" :key="(s.namespace || '') + '/' + s.name">
+                                <td>{{ s.namespace }}</td>
+                                <td>{{ s.name }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel">
+                    <h3>Events</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(e, idx) in events" :key="idx">
+                                <td>{{ e.type }}</td>
+                                <td>
+                                    {{ e.message && e.message.includes('500') ? 'Internal Server Error (500)' : e.message }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -108,6 +168,88 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div class="panel">
+                    <h3>ReplicaSets</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Namespace</th>
+                                <th>Name</th>
+                                <th>Replicas</th>
+                                <th>Ready</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="r in replicasets" :key="r.namespace + '/' + r.name">
+                                <td>{{ r.namespace }}</td>
+                                <td>{{ r.name }}</td>
+                                <td>{{ r.replicas }}</td>
+                                <td>{{ r.ready }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel">
+                    <h3>DaemonSets</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Namespace</th>
+                                <th>Name</th>
+                                <th>Desired</th>
+                                <th>Ready</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="d in daemonsets" :key="d.namespace + '/' + d.name">
+                                <td>{{ d.namespace }}</td>
+                                <td>{{ d.name }}</td>
+                                <td>{{ d.desired }}</td>
+                                <td>{{ d.number_ready }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel">
+                    <h3>StatefulSets</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Namespace</th>
+                                <th>Name</th>
+                                <th>Replicas</th>
+                                <th>Ready</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="s in statefulsets" :key="s.namespace + '/' + s.name">
+                                <td>{{ s.namespace }}</td>
+                                <td>{{ s.name }}</td>
+                                <td>{{ s.replicas }}</td>
+                                <td>{{ s.ready }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel">
+                    <h3>Jobs</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="j in jobs" :key="j.name">
+                                <td>{{ j.name }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -139,8 +281,16 @@ const clusterId = ref<string>('');
 
 const namespaces = ref<Array<{ name: string; status?: string }>>([]);
 const nodes = ref<Array<{ name: string; status?: string }>>([]);
-const pods = ref<Array<{ namespace: string; name: string; status?: string; node?: string; restarts?: number; created_at?: string }>>([]);
+const pods = ref<
+    Array<{ namespace: string; name: string; status?: string; node?: string; restarts?: number; created_at?: string }>
+>([]);
 const deployments = ref<Array<{ namespace: string; name: string; replicas?: number; ready?: number; updated?: number }>>([]);
+const services = ref<Array<{ namespace?: string; name: string; type?: string; cluster_ip?: string }>>([]);
+const events = ref<Array<{ type?: string; message?: string }>>([]);
+const replicasets = ref<Array<{ namespace?: string; name: string; replicas?: number; ready?: number }>>([]);
+const daemonsets = ref<Array<{ namespace?: string; name: string; desired?: number; number_ready?: number }>>([]);
+const statefulsets = ref<Array<{ namespace?: string; name: string; replicas?: number; ready?: number }>>([]);
+const jobs = ref<Array<{ namespace?: string; name: string }>>([]);
 
 const filters = ref<{ namespace: string; labelSelector: string }>({ namespace: '', labelSelector: '' });
 
@@ -174,6 +324,56 @@ const loadDeployments = async () => {
     deployments.value = resp?.deployments || [];
 };
 
+const loadServices = async () => {
+    if (!clusterId.value) return;
+    const params: Record<string, string> = {};
+    if (filters.value.namespace) params.namespace = filters.value.namespace;
+    if (filters.value.labelSelector) params.labelSelector = filters.value.labelSelector;
+    const resp = await getResourcesInfo('services', clusterId.value, params);
+    services.value = resp?.services || [];
+};
+
+const loadEvents = async () => {
+    if (!clusterId.value) return;
+    const params: Record<string, string> = {};
+    if (filters.value.namespace) params.namespace = filters.value.namespace;
+    const resp = await getResourcesInfo('events', clusterId.value, params);
+    events.value = resp?.events || [];
+};
+
+const loadReplicaSets = async () => {
+    if (!clusterId.value) return;
+    const params: Record<string, string> = {};
+    if (filters.value.namespace) params.namespace = filters.value.namespace;
+    if (filters.value.labelSelector) params.labelSelector = filters.value.labelSelector;
+    const resp = await getResourcesInfo('replicasets', clusterId.value, params);
+    replicasets.value = resp?.replicasets || [];
+};
+
+const loadDaemonSets = async () => {
+    if (!clusterId.value) return;
+    const params: Record<string, string> = {};
+    if (filters.value.namespace) params.namespace = filters.value.namespace;
+    const resp = await getResourcesInfo('daemonsets', clusterId.value, params);
+    daemonsets.value = resp?.daemonsets || [];
+};
+
+const loadStatefulSets = async () => {
+    if (!clusterId.value) return;
+    const params: Record<string, string> = {};
+    if (filters.value.namespace) params.namespace = filters.value.namespace;
+    const resp = await getResourcesInfo('statefulsets', clusterId.value, params);
+    statefulsets.value = resp?.statefulsets || [];
+};
+
+const loadJobs = async () => {
+    if (!clusterId.value) return;
+    const params: Record<string, string> = {};
+    if (filters.value.namespace) params.namespace = filters.value.namespace;
+    const resp = await getResourcesInfo('jobs', clusterId.value, params);
+    jobs.value = resp?.jobs || [];
+};
+
 const drawChart = () => {
     if (!chartDom.value) return;
     if (!chartInstance) chartInstance = echarts.init(chartDom.value);
@@ -197,7 +397,16 @@ const reloadUsage = async () => {
 };
 
 const reloadPodsAndDeployments = async () => {
-    await Promise.all([loadPods(), loadDeployments()]);
+    await Promise.all([
+        loadPods(),
+        loadDeployments(),
+        loadServices(),
+        loadEvents(),
+        loadReplicaSets(),
+        loadDaemonSets(),
+        loadStatefulSets(),
+        loadJobs(),
+    ]);
 };
 
 const reloadAll = async () => {
@@ -252,23 +461,86 @@ function copyToClipboard(text: string) {
 }
 .toolbar {
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    width: 100%;
+    flex-direction: row;
+    padding: 0.5rem;
+    flex-wrap: wrap; /* allow items to wrap to next line on narrow widths */
 }
-.toolbar .spacer { flex: 1; }
+
+.toolbar .spacer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-width: 0; /* prevent flex item from enforcing intrinsic width */
+    margin-left: 120px;
+}
+
 .content {
     display: grid;
-    grid-template-columns: 1.1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 1.5rem;
     margin-top: 1rem;
 }
-.panel { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-.chart { width: 100%; height: 320px; }
-.status.ok { color: #2ecc71; font-weight: 600; }
-.status.warn { color: #e67e22; font-weight: 600; }
-.primary-button.cluster-detail { margin-left: 0; }
-.id-box { display: flex; align-items: center; gap: 0.5rem; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+/* ensure grid children can shrink within their columns */
+.content > .left,
+.content > .right {
+    min-width: 0;
+}
+
+.right {
+    flex: 1;
+}
+
+.panel {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-top: 10px;
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed; /* prevent long content from expanding the table */
+}
+.data-table th,
+.data-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.chart {
+    width: 100%;
+    height: 320px;
+}
+.status.ok {
+    color: #2ecc71;
+    font-weight: 600;
+}
+.status.warn {
+    color: #e67e22;
+    font-weight: 600;
+}
+.primary-button.cluster-detail {
+    margin-left: 0;
+}
+.id-box {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+/* allow long IDs/UUIDs to wrap instead of forcing horizontal scroll */
+.id-box code.mono {
+    display: inline-block;
+    max-width: 100%;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}
 </style>

@@ -10,6 +10,7 @@ const router = createRouter({
         {
             path: '/',
             component: () => import('@/layouts/DefaultLayout.vue'),
+            meta: { requiresAuth: true },
             children: [
                 {
                     path: 'dashboard',
@@ -47,14 +48,9 @@ const router = createRouter({
                     component: () => import('@/views/HelpView.vue'),
                 },
                 {
-                    path: 'pods',
-                    name: 'pods',
-                    component: () => import('@/views/PodsView.vue'),
-                },
-                {
-                    path: 'nodes',
-                    name: 'nodes',
-                    component: () => import('@/views/NodesView.vue'),
+                    path: 'detector',
+                    name: 'detector',
+                    component: () => import('@/views/DetectorView.vue'),
                 },
             ],
         },
@@ -73,11 +69,40 @@ const router = createRouter({
 
 export default router;
 
+// ---- Auth helpers ----
+function normalizeToken(t: string | null): string | null {
+    if (!t) return null;
+    let s = t.trim();
+    // strip wrapping quotes if any
+    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+        s = s.slice(1, -1);
+    }
+    // strip Bearer prefix (case-insensitive)
+    s = s.replace(/^Bearer\s+/i, '');
+    return s;
+}
+
+function getStoredToken(): string | null {
+    const raw =
+        localStorage.getItem('cloud-dashboard-token') ||
+        sessionStorage.getItem('cloud-dashboard-token');
+    return normalizeToken(raw);
+}
+
+// note: clearStoredToken removed since guard only checks presence now
+
+// base64UrlToBase64 helper removed (not used in current guard)
+
+// JWT helpers removed for now; can be re-enabled when enforcing token expiry
+
 // Global auth guard: redirect to /login when no platform token
 router.beforeEach((to, _from, next) => {
-    const publicNames = new Set(['login', 'register']);
-    if (publicNames.has(to.name as string)) return next();
-    const token = localStorage.getItem('cloud-dashboard-token') || sessionStorage.getItem('cloud-dashboard-token');
+    const needsAuth = to.matched.some(r => {
+        const m = r.meta as Record<string, unknown> | undefined;
+        return Boolean(m && (m as { requiresAuth?: boolean }).requiresAuth);
+    });
+    if (!needsAuth) return next();
+    const token = getStoredToken();
     if (!token) return next({ name: 'login', query: { redirect: to.fullPath } });
     next();
 });

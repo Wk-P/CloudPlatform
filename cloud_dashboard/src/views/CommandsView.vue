@@ -12,36 +12,56 @@
                 <option value="delete">delete</option>
                 <option value="scale">scale</option>
             </select>
-            <select v-if="['get','describe','logs','scale','delete'].includes(action)" v-model="resource">
+            <select v-if="['get', 'describe', 'logs', 'scale', 'delete'].includes(action)" v-model="resource">
                 <option value="pods">pods</option>
-                <option value="services">services</option>
-                <option value="deployments">deployments</option>
+                <option value="svc">services</option>
+                <option value="deploy">deployments</option>
             </select>
             <input v-model="clusterId" placeholder="cluster id" class="default-input command-input" />
             <input v-model="namespace" placeholder="namespace (optional)" class="default-input command-input" />
-            <template v-if="action==='get'">
+            <template v-if="action === 'get'">
                 <!-- no extra inputs -->
             </template>
-            <template v-else-if="action==='describe' || action==='logs'">
+            <template v-else-if="action === 'describe' || action === 'logs'">
                 <input v-model="name" placeholder="name (for describe/logs)" class="default-input command-input" />
-                <input v-if="action==='logs'" v-model.number="tailLines" type="number" placeholder="tail lines (logs)" class="default-input command-input" />
+                <input
+                    v-if="action === 'logs'"
+                    v-model.number="tailLines"
+                    type="number"
+                    placeholder="tail lines (logs)"
+                    class="default-input command-input"
+                />
             </template>
-            <template v-else-if="action==='apply'">
+            <template v-else-if="action === 'apply'">
                 <div class="apply-toolbar">
-                    <small class="hint">Paste Kubernetes configuration (YAML or JSON). Support JSON of action/cluster_id/manifest</small>
+                    <small class="hint"
+                        >Paste Kubernetes configuration (YAML or JSON). Support JSON of action/cluster_id/manifest</small
+                    >
                     <div class="spacer"></div>
                     <button class="secondary-small-button" type="button" @click="fillNginx">Fill Nginx Example</button>
-                    <button class="secondary-small-button" type="button" @click="tryExtractFromJson">Try Extracting from JSON</button>
+                    <button class="secondary-small-button" type="button" @click="tryExtractFromJson">
+                        Try Extracting from JSON
+                    </button>
                 </div>
-                <textarea v-model="manifest" placeholder="Paste YAML or JSON manifest here" class="default-input command-input manifest-input"></textarea>
+                <textarea
+                    v-model="manifest"
+                    placeholder="Paste YAML or JSON manifest here"
+                    class="default-input command-input manifest-input"
+                ></textarea>
             </template>
-            <template v-else-if="action==='delete'">
+            <template v-else-if="action === 'delete'">
                 <input v-model="name" placeholder="name (to delete)" class="default-input command-input" />
                 <input v-model="kind" placeholder="kind (optional, overrides resource)" class="default-input command-input" />
             </template>
-            <template v-else-if="action==='scale'">
+            <template v-else-if="action === 'scale'">
                 <input v-model="name" placeholder="deployment name" class="default-input command-input" />
-                <input v-model.number="replicas" type="number" min="0" placeholder="replicas" class="default-input command-input" />
+                <input
+                    v-model.number="replicas"
+                    type="number"
+                    min="0"
+                    placeholder="replicas"
+                    class="default-input command-input"
+                />
             </template>
             <button class="primary-small-button" @click="executeCommand">RUN</button>
         </div>
@@ -112,7 +132,13 @@
                                         <td class="mono">{{ (it as any).name }}</td>
                                         <td>{{ (it as any).type }}</td>
                                         <td>{{ (it as any).cluster_ip }}</td>
-                                        <td>{{ Array.isArray((it as any).ports) ? (it as any).ports.join(', ') : (it as any).ports }}</td>
+                                        <td>
+                                            {{
+                                                Array.isArray((it as any).ports)
+                                                    ? (it as any).ports.join(', ')
+                                                    : (it as any).ports
+                                            }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -163,7 +189,7 @@
                     <template v-if="result.status_code !== 0 && result.error">
                         <h4>Error</h4>
                         <pre class="pre-wrap">{{ result.error }}</pre>
-                        <h4 style="margin-top:0.75rem">Output</h4>
+                        <h4 style="margin-top: 0.75rem">Output</h4>
                         <pre class="pre-wrap">{{ result.output }}</pre>
                     </template>
                     <template v-else>
@@ -188,8 +214,8 @@ import { postCommand, type CommandPayload } from '@/utils';
 import { computed, ref, onMounted } from 'vue';
 import { useClusterStore } from '@/stores/cluster';
 
-const action = ref<'get'|'describe'|'logs'|'apply'|'delete'|'scale'>('get');
-const resource = ref<'pods'|'services'|'deployments'>('pods');
+const action = ref<'get' | 'describe' | 'logs' | 'apply' | 'delete' | 'scale'>('get');
+const resource = ref<'pods' | 'services' | 'deployments'>('pods');
 const clusterId = ref('');
 const namespace = ref('');
 const name = ref('');
@@ -216,8 +242,10 @@ const executeCommand = async () => {
         if (manifest.value && (manifest.value.trim().startsWith('{') || manifest.value.trim().startsWith('['))) {
             try {
                 const js: unknown = JSON.parse(manifest.value);
-                const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
-                const isManifestList = (v: unknown): v is Array<Record<string, unknown>> => Array.isArray(v) && v.every(x => !!x && typeof x === 'object' && !Array.isArray(x));
+                const isRecord = (v: unknown): v is Record<string, unknown> =>
+                    !!v && typeof v === 'object' && !Array.isArray(v);
+                const isManifestList = (v: unknown): v is Array<Record<string, unknown>> =>
+                    Array.isArray(v) && v.every((x) => !!x && typeof x === 'object' && !Array.isArray(x));
                 if (isRecord(js)) {
                     const obj = js;
                     const m = obj.manifest as unknown;
@@ -296,39 +324,35 @@ onMounted(() => {
 });
 
 type Dict = Record<string, unknown>;
-type Parsed =
-    | { kind: 'array'; data: Dict[] }
-    | { kind: 'object'; data: Dict }
-    | { kind: 'text'; data: string }
-    | null;
+type Parsed = { kind: 'array'; data: Dict[] } | { kind: 'object'; data: Dict } | { kind: 'text'; data: string } | null;
 
 const parsed = computed<Parsed>(() => {
-  if (!result.value) return null;
-  const raw = result.value.output || result.value.error || '';
-  try {
-    const js = JSON.parse(raw);
-    if (Array.isArray(js)) return { kind: 'array', data: js };
-    if (js && typeof js === 'object') return { kind: 'object', data: js };
+    if (!result.value) return null;
+    const raw = result.value.output || result.value.error || '';
+    try {
+        const js = JSON.parse(raw);
+        if (Array.isArray(js)) return { kind: 'array', data: js };
+        if (js && typeof js === 'object') return { kind: 'object', data: js };
     } catch {
-    // not JSON
-  }
-  return { kind: 'text', data: raw };
+        // not JSON
+    }
+    return { kind: 'text', data: raw };
 });
 
 const groupedByNs = computed<Record<string, Dict[]>>(() => {
-  if (!parsed.value || parsed.value.kind !== 'array') return {};
+    if (!parsed.value || parsed.value.kind !== 'array') return {};
     const groups: Record<string, Dict[]> = {};
-  for (const item of parsed.value.data) {
-    const ns = (item.ns as string) || 'default';
-    (groups[ns] ||= []).push(item);
-  }
-  return groups;
+    for (const item of parsed.value.data) {
+        const ns = (item.ns as string) || 'default';
+        (groups[ns] ||= []).push(item);
+    }
+    return groups;
 });
 
 function formatValue(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'object') return JSON.stringify(v, null, 2);
-  return String(v);
+    if (v == null) return '';
+    if (typeof v === 'object') return JSON.stringify(v, null, 2);
+    return String(v);
 }
 
 const displayText = computed(() => {
@@ -370,35 +394,69 @@ function tryExtractFromJson() {
 
 <style scoped>
 .commands-page {
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    overflow-x: hidden; /* prevent page-level horizontal scroll */
 }
 .command-output {
+    width: 100%;
     margin-top: 20px;
     padding: 2rem;
     background-color: white;
     border-radius: 8px;
-    box-shadow: 3px 3px 1rem 0.5rem #aaa;
+    box-sizing: border-box;
+    overflow-x: hidden; /* avoid horizontal scroll; rely on wrapping */
 }
 
-.result-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.result-table th, .result-table td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
-.item-head { width: 220px; background: #f7f7f7; }
-.item-body { width: auto; word-break: break-word; white-space: pre-wrap; }
-.result-empty { color: #666; }
+.result-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.result-table th,
+.result-table td {
+    border: 1px solid #ddd;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.item-head {
+    width: 220px;
+    background: #f7f7f7;
+}
+.item-body {
+    width: auto;
+    word-break: break-word;
+    overflow-wrap: anywhere; /* prevent long tokens from overflowing */
+    white-space: pre-wrap;
+}
+.result-empty {
+    color: #666;
+}
 
 .command-input {
     color: rgb(38, 38, 232);
     min-width: 200px;
 }
 .manifest-input {
-    min-width: min(720px, 95vw);
+    width: 100%;
+    min-width: 0; /* avoid forcing overflow on small screens */
     min-height: 120px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
-.apply-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
-.apply-toolbar .spacer { flex: 1; }
-.hint { color: #666; }
+.apply-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+.apply-toolbar .spacer {
+    flex: 1;
+}
+.hint {
+    color: #666;
+}
 
 .controls {
     display: flex;
@@ -411,17 +469,37 @@ function tryExtractFromJson() {
 .cmd {
     font-weight: 600;
     color: rgb(38, 38, 232);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    overflow-wrap: anywhere;
 }
 
 summary {
     cursor: pointer;
 }
 
-.section { margin-top: 1rem; }
-.section-title { font-weight: 600; margin: 0.25rem 0 0.5rem; }
-.pre-wrap { white-space: pre-wrap; word-break: break-word; }
-.raw-toggle { margin-top: 1rem; }
-.result-table.meta { margin-bottom: 1rem; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.section {
+    margin-top: 1rem;
+}
+.section-title {
+    font-weight: 600;
+    margin: 0.25rem 0 0.5rem;
+}
+.pre-wrap {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden; /* no horizontal scroll; enforce wrapping */
+}
+.raw-toggle {
+    margin-top: 1rem;
+}
+.result-table.meta {
+    margin-bottom: 1rem;
+}
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    overflow-wrap: anywhere;
+}
 </style>

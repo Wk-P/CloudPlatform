@@ -5,7 +5,6 @@
                 <h2>Clusters Management</h2>
                 <p>Manage Kubernetes clusters</p>
             </div>
-            <div class="spacer" />
             <button class="primary-button" @click="showForm('register')">Register New Cluster</button>
         </div>
 

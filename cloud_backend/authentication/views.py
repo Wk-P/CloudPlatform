@@ -247,15 +247,28 @@ class SAInfoView(APIView):
         # prefer provided namespace else claim namespace else default
         use_ns = ns or sa_ns or 'default'
 
+        rules = None
+        warning = None
         try:
             from kubernetes import client
             api_client = _k8s_api_client_from_token(host, token)
-            auth_api = client.AuthorizationV1Api(api_client)
-            body = client.V1SelfSubjectRulesReview(spec=client.V1SelfSubjectRulesReviewSpec(namespace=use_ns))
-            ssrr = auth_api.create_self_subject_rules_review(body=body)
-            rules = client.ApiClient().sanitize_for_serialization(ssrr)
+            # Try preferred: SelfSubjectRulesReview (requires /apis proxying)
+            try:
+                auth_api = client.AuthorizationV1Api(api_client)
+                body = client.V1SelfSubjectRulesReview(spec=client.V1SelfSubjectRulesReviewSpec(namespace=use_ns))
+                ssrr = auth_api.create_self_subject_rules_review(body=body)
+                rules = client.ApiClient().sanitize_for_serialization(ssrr)
+            except Exception as e:
+                # Fallback when /apis may not be routed by ingress: query /version to validate connectivity
+                try:
+                    ver_api = client.VersionApi(api_client)
+                    ver = ver_api.get_code()
+                    rules = {'fallback': 'version', 'version': client.ApiClient().sanitize_for_serialization(ver)}
+                    warning = f'authorization API not reachable via ingress: {e}'
+                except Exception as e2:
+                    return Response({'detail': f'Failed to query rules: {e}; fallback version failed: {e2}'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({'detail': f'Failed to query rules: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': f'Failed to prepare k8s client: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
         resp = {
             'service_account': {
@@ -271,4 +284,6 @@ class SAInfoView(APIView):
             'query_namespace': use_ns,
             'rules': rules,
         }
+        if warning:
+            resp['warning'] = warning
         return Response(resp)

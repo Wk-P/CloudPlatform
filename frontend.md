@@ -18,6 +18,12 @@
 - 其它
 	- 修复 Headers 合并的类型问题，TypeScript 校验通过。
 
+## 2025年8月25日
+- 新增 Zeek Detector 页面（ZeekDetectorView.vue）
+	- 支持查看 Agent 列表（agent_id/version/status/last_heartbeat）。
+	- 支持获取/编辑/保存默认配置（/api/anomaly/zeek/config/）。
+	- 路由：新增 /zeek，侧边栏加入 Zeek 菜单项。
+
 ## 2025年8月23日
 - Commands Console（CommandsView.vue）
 	- 表单扩展：新增动作 apply/delete/scale；按动作展示对应输入项（manifest、kind/name、replicas 等）。

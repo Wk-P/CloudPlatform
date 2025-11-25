@@ -419,28 +419,41 @@ def get_cluster_usage(request, id: int):
         total_mem += mem_mi
 
     # usage
-    node_metrics = metrics.list_cluster_custom_object(
-        group="metrics.k8s.io", version="v1beta1", plural="nodes"
-    )
-    for item in node_metrics['items']:
-        cpu = item['usage']['cpu']
-        mem = item['usage']['memory']
+    try:
+        node_metrics = metrics.list_cluster_custom_object(
+            group="metrics.k8s.io", version="v1beta1", plural="nodes"
+        )
+        for item in node_metrics['items']:
+            cpu = item['usage']['cpu']
+            mem = item['usage']['memory']
 
-        if cpu.endswith('n'):
-            used_cpu += int(cpu[:-1]) / 1_000_000_000
-        elif cpu.endswith('m'):
-            used_cpu += int(cpu[:-1]) / 1000
+            if cpu.endswith('n'):
+                used_cpu += int(cpu[:-1]) / 1_000_000_000
+            elif cpu.endswith('m'):
+                used_cpu += int(cpu[:-1]) / 1000
 
-        if mem.endswith('Ki'):
-            used_mem += int(mem[:-2]) // 1024
+            if mem.endswith('Ki'):
+                used_mem += int(mem[:-2]) // 1024
+    except Exception as ex:
+        from kubernetes.client.rest import ApiException
+        if isinstance(ex, ApiException):
+            return JsonResponse({
+                "error": "metrics-server can not be reached",
+                "details": str(ex)
+            }, status=503)
+        else:
+            return JsonResponse({
+                "error": "get node metrics failed",
+                "details": str(ex)
+            }, status=500)
 
     return JsonResponse({
         "total_cpu": f"{total_cpu} cores",
         "used_cpu": f"{used_cpu:.2f} cores",
-        "cpu_utilization": f"{used_cpu/total_cpu*100:.2f}%",
+    "cpu_utilization": f"{(used_cpu/total_cpu*100) if total_cpu else 0:.2f}%",
         "total_memory": f"{total_mem} Mi",
         "used_memory": f"{used_mem} Mi",
-        "memory_utilization": f"{used_mem/total_mem*100:.2f}%",
+    "memory_utilization": f"{(used_mem/total_mem*100) if total_mem else 0:.2f}%",
     })
 
 
@@ -483,10 +496,36 @@ def get_node_usage(request, id, node_name):
     cpu = int(node.status.capacity['cpu'])
     mem_mi = int(node.status.capacity['memory'].replace('Ki', '')) // 1024
 
-    # usage
-    node_metrics = metrics.get_cluster_custom_object(
-        group="metrics.k8s.io", version="v1beta1", plural="nodes", name=node_name
-    )
+    # usage (handle metrics 404 gracefully)
+    from kubernetes.client.rest import ApiException
+    try:
+        node_metrics = metrics.get_cluster_custom_object(
+            group="metrics.k8s.io", version="v1beta1", plural="nodes", name=node_name
+        )
+    except ApiException as ex:
+        if getattr(ex, 'status', None) == 404:
+            # Fallback: try to find metrics from the list; if still missing, default to zero with a warning
+            try:
+                nm_list = metrics.list_cluster_custom_object(
+                    group="metrics.k8s.io", version="v1beta1", plural="nodes"
+                )
+                found = None
+                for it in nm_list.get('items', []):
+                    meta = it.get('metadata') or {}
+                    if meta.get('name') == node_name:
+                        found = it
+                        break
+                if found:
+                    node_metrics = found
+                else:
+                    node_metrics = {"usage": {"cpu": "0m", "memory": "0Ki"}, "_warning": "metrics not found for this node; defaults to 0"}
+            except Exception:
+                node_metrics = {"usage": {"cpu": "0m", "memory": "0Ki"}, "_warning": "metrics not found for this node; defaults to 0"}
+        else:
+            return JsonResponse({
+                "error": "failed to get node metrics",
+                "details": str(ex)
+            }, status=503)
 
     cpu_usage = node_metrics['usage']['cpu']
     mem_usage = node_metrics['usage']['memory']
@@ -503,15 +542,18 @@ def get_node_usage(request, id, node_name):
     if mem_usage.endswith('Ki'):
         mem_u = int(mem_usage[:-2]) // 1024
 
-    return JsonResponse({
+    data = {
         "name": node_name,
         "total_cpu": f"{cpu} cores",
         "used_cpu": f"{cpu_u:.2f} cores",
-        "cpu_utilization": f"{cpu_u / cpu * 100:.2f}%",
+        "cpu_utilization": f"{(cpu_u / cpu * 100) if cpu else 0:.2f}%",
         "total_memory": f"{mem_mi} Mi",
         "used_memory": f"{mem_u} Mi",
-        "memory_utilization": f"{mem_u / mem_mi * 100:.2f}%"
-    })
+        "memory_utilization": f"{(mem_u / mem_mi * 100) if mem_mi else 0:.2f}%"
+    }
+    if node_metrics and isinstance(node_metrics, dict) and node_metrics.get('_warning'):
+        data['warning'] = node_metrics.get('_warning')
+    return JsonResponse(data)
 
 
 @require_http_methods(["GET"])

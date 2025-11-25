@@ -11,6 +11,11 @@ const runtime_api = {
         deployments: '/deployments/',
         daemonsets: '/daemonsets/',
         statefulsets: '/statefulsets/',
+    replicasets: '/replicasets/',
+    jobs: '/jobs/',
+    ingresses: '/ingresses/',
+    hpas: '/hpas/',
+    cronjobs: '/cronjobs/',
         namespaces: '/namespaces/',
     },
     options: {
@@ -53,7 +58,7 @@ const redirectToLogin = () => {
 };
 
 // Wrapper to auto-attach Authorization and handle 401 globally
-const fetchWithAuth = async (url: string, init: RequestInit = {}) => {
+export const fetchWithAuth = async (url: string, init: RequestInit = {}) => {
     const base = authHeaders();
     let hdrs: HeadersInit = base;
     if (init.headers) {

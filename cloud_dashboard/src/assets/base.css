@@ -15,7 +15,8 @@
 html,
 body {
     min-height: 100dvh;
-    min-width: 100dvw;
+    /* Avoid using 100dvw which can include scrollbar width and cause horizontal overflow */
+    min-width: 100%;
 }
 
 body {
@@ -48,7 +49,7 @@ body {
     font-size: 1.1rem;
     font-weight: 500;
     background-color: var(--primary-button-background-color);
-    margin: 0.5rem;
+    margin: 0.5rem 0;
     border-radius: 0.4rem;
 }
 
@@ -75,6 +76,42 @@ body {
     background-color: var(--primary-button-background-color-hover);
 }
 
+.warning-button {
+    padding-left: 1rem 2rem;
+    min-width: 200px;
+    height: 40px;
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 500;
+    background-color: red;
+    margin: 0.5rem 0;
+    border-radius: 0.4rem;
+}
+
+.warning-button:hover {
+    cursor: pointer;
+    background-color: darkred;
+}
+
+.warning-small-button {
+    padding-left: 1rem 2rem;
+    min-width: 130px;
+    height: 35px;
+    border: none;
+    color: var(--primary-button-font-color);
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0.5rem;
+    border-radius: 0.4rem;
+    background-color: red;
+}
+
+.warning-small-button:hover {
+    cursor: pointer;
+    background-color: darkred;
+}
+
 table {
     border-collapse: collapse;
 }
@@ -85,7 +122,66 @@ table {
     padding: 0.5rem 0.7rem;
     border: 1px solid #aaa;
     margin: 0.5rem 0.1rem;
-    width: 400px;
+    width: 100%;
+    max-width: 400px;
+    background: #fff;
+    color: #222;
+    font-size: 0.95rem;
+    transition: box-shadow .12s ease, border-color .12s ease, transform .06s ease;
+}
+
+.default-input:focus {
+    border-color: var(--primary-button-background-color);
+    box-shadow: 0 0 0 4px rgba(51, 51, 208, 0.08);
+    transform: translateY(-1px);
+}
+
+.input-small {
+    width: 3rem;
+    text-align: center;
+    padding: 0.28rem 0.35rem;
+    font-size: 0.9rem;
+}
+
+.select-small {
+    padding: 0.28rem 0.4rem;
+    font-size: 0.95rem;
+}
+
+/* Apply default input styles to native controls globally so existing templates don't need manual edits */
+input,
+select,
+textarea {
+    outline: none;
+    border-radius: 0.2rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid #aaa;
+    margin: 0.25rem 0.1rem;
+    background: #fff;
+    color: #222;
+    font-size: 0.95rem;
+    transition: box-shadow .12s ease, border-color .12s ease, transform .06s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--primary-button-background-color);
+    box-shadow: 0 0 0 4px rgba(51, 51, 208, 0.08);
+    transform: translateY(-1px);
+}
+
+/* Keep small-variant helpers for explicit usage */
+.input-small {
+    width: 3rem;
+    text-align: center;
+    padding: 0.28rem 0.35rem;
+    font-size: 0.9rem;
+}
+
+.select-small {
+    padding: 0.28rem 0.4rem;
+    font-size: 0.95rem;
 }
 
 .card {

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     # Third-patry apps
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
 
     # Custom apps
     'anomaly_detection',
@@ -157,6 +158,7 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.BrowsableAPIRenderer',
     ),
     'DEFAULT_PARSER_CLASSES': ('rest_framework.parsers.JSONParser',),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 

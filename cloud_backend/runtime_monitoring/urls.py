@@ -14,6 +14,8 @@ urlpatterns = [
     path('clusters/<int:id>/services/', rm_views.get_services, name='get_services'),
     path('clusters/<int:id>/events/', rm_views.get_events, name='get_events'),
     path('clusters/<int:id>/namespaces/', rm_views.get_namespaces, name='get_namespaces'),
+    path('clusters/<int:id>/ingresses/', rm_views.get_ingresses, name='get_ingresses'),
+    path('clusters/<int:id>/hpas/', rm_views.get_hpas, name='get_hpas'),
 
     # apps
     path('clusters/<int:id>/deployments/', rm_views.get_deployments, name='get_deployments'),
@@ -23,6 +25,7 @@ urlpatterns = [
 
     # batch
     path('clusters/<int:id>/jobs/', rm_views.get_jobs, name='get_jobs'),
+    path('clusters/<int:id>/cronjobs/', rm_views.get_cronjobs, name='get_cronjobs'),
 
     # more
 ]

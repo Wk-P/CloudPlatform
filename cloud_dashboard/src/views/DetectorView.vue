@@ -6,82 +6,74 @@
             <button class="primary-button" @click="loadTrend">Refresh Trend</button>
             <button class="primary-button" @click="loadRedisData">Refresh Redis Data</button>
         </div>
+
         <section class="blacklist">
             <h3>Ingress Blacklist</h3>
-            <p class="hint">Refresh per 30 seconds (URL TBD, using placeholder request).</p>
+            <p class="hint">Auto-refreshes every 30 seconds. Data source TBD.</p>
             <div v-if="blError" class="error">{{ blError }}</div>
-            <table v-if="blacklist.length">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Source (IP/CIDR/Pattern)</th>
-                        <th>Control</th>
-                        <th>Scope</th>
-                        <th>Reason</th>
-                        <th>Updated At</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(b, idx) in blacklist" :key="idx">
-                        <td>{{ idx + 1 }}</td>
-                        <td>{{ b.source || b.ip || b.cidr || b.pattern || '-' }}</td>
-                        <td>{{ b.action || b.mode || b.control || '-' }}</td>
-                        <td>{{ b.scope || b.target || '-' }}</td>
-                        <td>{{ b.reason || b.note || '' }}</td>
-                        <td>{{ b.updated_at || b.updatedAt || b.updateTime || '' }}</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div v-else>
-                <em>No blacklist items</em>
+            <div v-if="blacklist.length">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Source (IP/CIDR/Pattern)</th>
+                            <th>Control</th>
+                            <th>Scope</th>
+                            <th>Reason</th>
+                            <th>Updated At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(b, idx) in blacklist" :key="idx">
+                            <td>{{ idx + 1 }}</td>
+                            <td>{{ b.source || b.ip || b.cidr || b.pattern || '-' }}</td>
+                            <td>{{ b.action || b.mode || b.control || '-' }}</td>
+                            <td>{{ b.scope || b.target || '-' }}</td>
+                            <td>{{ b.reason || b.note || '' }}</td>
+                            <td>{{ b.updated_at || b.updatedAt || b.updateTime || '' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            <details style="margin-top: 0.5rem" v-if="blacklist.length">
-                <summary>Check the original data</summary>
-                <pre>{{ JSON.stringify(blacklist, null, 2) }}</pre>
-            </details>
-        </section>
+            <div v-else class="hint">No blacklist entries.</div>
 
-        <section class="controls">
-            <h3>Supported Controls (NGINX Ingress)</h3>
-            <p class="hint">
-                Common anomaly protection and rate-limit keys (backend applies policies based on these; align frontend and
-                operations).
-            </p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Key</th>
-                        <th>Type</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="c in supportedControls" :key="c.key">
-                        <td>
-                            <code>{{ c.key }}</code>
-                        </td>
-                        <td>{{ c.type }}</td>
-                        <td>{{ c.desc }}</td>
-                    </tr>
-                </tbody>
-            </table>
-            <p class="hint" style="margin-top: 0.5rem">
-                hint: For getting the real external source IP, it is recommended to set the Ingress Controller Service to
-                externalTrafficPolicy=Local and configure trusted forwarding headers according to the environment.
-            </p>
+            <div class="supported" v-if="supportedControls.length">
+                <h4>Supported NGINX controls</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in supportedControls" :key="item.key">
+                            <td>{{ item.key }}</td>
+                            <td>{{ item.type }}</td>
+                            <td>{{ item.desc }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <section class="trend">
-            <h3>Traffic Trend</h3>
-            <p class="hint">Updated every 30 seconds (URL TBD, using placeholder request).</p>
+            <h3>Ingress Traffic Trend</h3>
+            <p class="hint">Lightweight SVG chart (placeholder API).</p>
             <div v-if="trendError" class="error">{{ trendError }}</div>
-            <div v-if="!trendPoints.length"><em>No trend data</em></div>
-            <div v-else class="chart-wrap">
-                <svg :viewBox="`0 0 ${chartW} ${chartH}`" preserveAspectRatio="none" class="chart">
-                    <rect x="0" y="0" :width="chartW" :height="chartH" fill="#fff" stroke="#eee" />
-                    <!-- path line -->
-                    <path :d="pathD" stroke="#3b82f6" stroke-width="2" fill="none" />
-                    <!-- last point marker -->
+            <div v-if="trendPoints.length" class="chart-wrap">
+                <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="chart" role="img">
+                    <path :d="pathD" fill="none" stroke="#60a5fa" stroke-width="2" />
+                    <circle
+                        v-for="(p, idx) in trendPoints"
+                        :key="idx"
+                        :cx="pad + ((chartW - pad * 2) * (p.ts - trendPoints[0].ts)) / Math.max(1, trendPoints[trendPoints.length - 1].ts - trendPoints[0].ts)"
+                        :cy="chartH - pad - ((chartH - pad * 2) * (p.value - Math.min(...trendPoints.map((t) => t.value)))) / Math.max(1, Math.max(...trendPoints.map((t) => t.value)) - Math.min(...trendPoints.map((t) => t.value)))"
+                        r="2"
+                        fill="#38bdf8"
+                        opacity="0.6"
+                    />
                     <circle v-if="lastPoint" :cx="lastPoint.x" :cy="lastPoint.y" r="3" fill="#ef4444" />
                 </svg>
                 <div class="chart-legend">
@@ -89,15 +81,15 @@
                     <span v-if="lastValue !== null">Last: {{ lastValue }}</span>
                 </div>
             </div>
+            <div v-else class="hint">No trend data yet.</div>
         </section>
 
         <section class="redisdata">
             <h3>Redis Data</h3>
-            <p class="hint">Format and columns TBD. Data structure left blank for later fill.</p>
+            <p class="hint">Schema and visualization are placeholders pending backend contract.</p>
             <div v-if="redisError" class="error">{{ redisError }}</div>
             <div v-if="!redisData.length"><em>No redis data</em></div>
             <div v-else>
-                <!-- TODO: 填写表头和解析逻辑 -->
                 <table>
                     <thead>
                         <tr>
@@ -138,23 +130,22 @@
                     </tbody>
                 </table>
 
-                <!-- pagination controls -->
-                <div class="pagination" style="margin-top: .5rem; display:flex; align-items:center; gap: .5rem;">
+                <div class="pagination">
                     <button class="primary-small-button" @click="setPage(page - 1)" :disabled="page <= 1">Prev</button>
                     <span>Page</span>
                     <input class="default-input input-small" v-model.number="page" @change="setPage(page)" />
                     <span>/ {{ totalPages }}</span>
                     <button class="primary-small-button" @click="setPage(page + 1)" :disabled="page >= totalPages">Next</button>
 
-                    <label style="margin-left: 1rem">Per page:
+                    <label class="per-page">Per page:
                         <select class="select-small default-input" v-model.number="pageSize" @change="setPageSize(pageSize)">
                             <option v-for="opt in [25,50,100]" :key="opt" :value="opt">{{ opt }}</option>
                         </select>
                     </label>
 
-                    <span style="margin-left:auto">Total: {{ total }}</span>
+                    <span class="total">Total: {{ total }}</span>
                 </div>
-                <details style="margin-top: 0.5rem">
+                <details class="raw-data">
                     <summary>Raw Redis Data</summary>
                     <pre>{{ JSON.stringify(redisData, null, 2) }}</pre>
                 </details>
@@ -397,7 +388,7 @@ async function loadTrend() {
 async function loadRedisData() {
     redisError.value = '';
     try {
-        // TODO: 替换 URLs.REDIS_DATA 为你的实际接口
+        // TODO: Replace URLs.INGRESS_REDIS_DATA_READ with the final API once available
         const res = await fetchWithAuth(URLs.INGRESS_REDIS_DATA_READ);
         if (!res.ok) {
             redisError.value = `Load redis data failed: ${res.status}`;
@@ -509,63 +500,27 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.page {
-    max-width: 980px;
-}
-.actions {
-    display: flex;
-    margin-bottom: 1rem;
-}
-.error {
-    color: #b00;
-    margin: 0.5rem 0;
-}
-textarea {
-    width: 100%;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-th,
-td {
-    border: 1px solid #ddd;
-    padding: 0.4rem 0.6rem;
-    text-align: left;
-}
+.page { max-width: 1080px; display: flex; flex-direction: column; gap: var(--space-4); }
+.actions { display: flex; gap: var(--space-2); margin-bottom: 1rem; flex-wrap: wrap; }
+.error { color: var(--color-danger); margin: 0.5rem 0; }
+textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); color: var(--color-text-primary); padding: var(--space-3); }
+table { width: 100%; border-collapse: collapse; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); overflow: hidden; }
+th, td { border: 1px solid var(--glass-border); padding: 0.4rem 0.6rem; text-align: left; color: var(--color-text-primary); }
+th { background: var(--color-surface-hover); }
+.supported { margin-top: 1rem; }
+.supported h4 { margin: 0.5rem 0; }
+.pagination { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.pagination .per-page { margin-left: 1rem; }
+.pagination .total { margin-left: auto; }
+.raw-data { margin-top: 0.5rem; }
+.raw-data pre { white-space: pre-wrap; word-break: break-word; }
+.input-small { max-width: 64px; }
+.select-small { max-width: 96px; }
 
-button {
-    margin-left: 0;
-    margin-right: 2rem;
-}
-
-/* removed agents section */
-.blacklist {
-    margin-bottom: 1rem;
-}
-.hint {
-    color: #666;
-    font-size: 12px;
-    margin: 0.25rem 0 0.5rem;
-}
-.trend {
-    margin: 1rem 0;
-}
-.chart-wrap {
-    width: 100%;
-    max-width: 980px;
-}
-.chart {
-    width: 100%;
-    height: 180px;
-    display: block;
-}
-.chart-legend {
-    color: #444;
-    font-size: 12px;
-    margin-top: 0.25rem;
-    display: flex;
-    gap: 1rem;
-}
+.blacklist { margin-bottom: 1rem; }
+.hint { color: var(--color-text-muted); font-size: 12px; margin: 0.25rem 0 0.5rem; }
+.trend { margin: 1rem 0; }
+.chart-wrap { width: 100%; max-width: 1080px; }
+.chart { width: 100%; height: 180px; display: block; }
+.chart-legend { color: var(--color-text-muted); font-size: 12px; margin-top: 0.25rem; display: flex; gap: 1rem; }
 </style>

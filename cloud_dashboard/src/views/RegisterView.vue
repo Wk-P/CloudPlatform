@@ -96,25 +96,26 @@ const toLogin = () => router.push('/login');
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 4vh 2vw;
-    background: #f5f5f5;
     min-height: 100vh;
+    padding: var(--space-8) var(--space-4);
+    background: radial-gradient(circle at 18% 28%, rgba(96,165,250,0.14), transparent 42%),
+        radial-gradient(circle at 82% 78%, rgba(245,87,108,0.12), transparent 40%),
+        var(--color-bg-primary);
 }
+
 .register-card {
     width: clamp(420px, 92vw, 720px);
-    padding: 20px;
+    padding: var(--space-8);
+    border-radius: var(--radius-xl);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     box-sizing: border-box;
 }
-.row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.spacer {
-    flex: 1;
-}
-.mb-12 {
-    margin-bottom: 12px;
-}
+
+.row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.spacer { flex: 1; }
+.mb-12 { margin-bottom: 12px; }
 </style>

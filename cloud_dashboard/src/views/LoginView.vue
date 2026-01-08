@@ -167,29 +167,30 @@ const guestLogin = async () => {
 <style scoped>
 .login-container {
     display: flex;
-    justify-content: center;
     align-items: center;
-    height: 100vh;
-    background: #f5f5f5;
+    justify-content: center;
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 20%, rgba(102,126,234,0.15), transparent 45%),
+        radial-gradient(circle at 80% 80%, rgba(245,87,108,0.12), transparent 40%),
+        var(--color-bg-primary);
+    padding: var(--space-8) var(--space-4);
 }
+
 .login-card {
-    width: clamp(360px, 90vw, auto);
-    padding: 20px;
-    box-sizing: border-box;
+    width: clamp(360px, 92vw, 540px);
+    padding: var(--space-8);
+    border-radius: var(--radius-xl);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     overflow: hidden;
 }
-.row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.spacer {
-    flex: 1;
-}
-.mb-12 {
-    margin-bottom: 12px;
-}
+
+.row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.spacer { flex: 1; }
+.mb-12 { margin-bottom: 12px; }
 
 .login-card :deep(.el-form),
 .login-card :deep(.el-form-item),
@@ -198,11 +199,40 @@ const guestLogin = async () => {
     width: 100%;
 }
 
-.login-card :deep(.el-alert__content) {
-    word-break: break-word;
+.login-card :deep(.el-input__wrapper) {
+    background-color: var(--color-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    box-shadow: none;
+    transition: all 0.2s ease;
 }
 
-.login-card :deep(.el-button) {
-    white-space: nowrap;
+.login-card :deep(.el-input__wrapper:hover) {
+    background-color: var(--color-surface-hover);
+    border-color: rgba(148, 163, 184, 0.4);
 }
+
+.login-card :deep(.el-input__wrapper.is-focus) {
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.login-card :deep(.el-input__inner) {
+    color: var(--color-text-primary);
+    font-size: 14px;
+}
+
+.login-card :deep(.el-input__inner::placeholder) {
+    color: var(--color-text-muted);
+}
+
+.login-card :deep(.el-form-item__label) {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.login-card :deep(.el-alert__content) { word-break: break-word; }
+.login-card :deep(.el-button) { white-space: nowrap; }
 </style>

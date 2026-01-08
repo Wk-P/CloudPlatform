@@ -1,69 +1,88 @@
 <template>
     <div class="commands-page">
-        <h2>Commands Console</h2>
-        <p>Here run Kubernetes and OpenStack Commands.</p>
+        <div class="hero">
+            <div>
+                <h2>Command Console</h2>
+                <p class="muted">Run kubectl-style actions, inspect objects, and apply manifests.</p>
+            </div>
+            <span class="pill">K8s Toolkit</span>
+        </div>
 
-        <div class="controls">
-            <select v-model="action">
-                <option value="get">get</option>
-                <option value="describe">describe</option>
-                <option value="logs">logs</option>
-                <option value="apply">apply</option>
-                <option value="delete">delete</option>
-                <option value="scale">scale</option>
-            </select>
-            <select v-if="['get', 'describe', 'logs', 'scale', 'delete'].includes(action)" v-model="resource">
-                <option value="pods">pods</option>
-                <option value="svc">services</option>
-                <option value="deploy">deployments</option>
-            </select>
-            <input v-model="clusterId" placeholder="cluster id" class="default-input command-input" />
-            <input v-model="namespace" placeholder="namespace (optional)" class="default-input command-input" />
-            <template v-if="action === 'get'">
-                <!-- no extra inputs -->
-            </template>
-            <template v-else-if="action === 'describe' || action === 'logs'">
-                <input v-model="name" placeholder="name (for describe/logs)" class="default-input command-input" />
+        <div class="card">
+            <div class="controls">
+                <select v-model="action" class="default-input command-input">
+                    <option value="get">get</option>
+                    <option value="describe">describe</option>
+                    <option value="logs">logs</option>
+                    <option value="apply">apply</option>
+                    <option value="delete">delete</option>
+                    <option value="scale">scale</option>
+                </select>
+
+                <select v-if="action !== 'apply' && action !== 'scale'" v-model="resource" class="default-input command-input">
+                    <option value="pods">pods</option>
+                    <option value="services">services</option>
+                    <option value="deployments">deployments</option>
+                </select>
+
+                <input v-model="clusterId" class="default-input command-input" placeholder="cluster id" />
+                <input v-model="namespace" class="default-input command-input" placeholder="namespace (optional)" />
+
+                <input
+                    v-if="action !== 'apply' && action !== 'scale'"
+                    v-model="name"
+                    class="default-input command-input"
+                    placeholder="resource name (optional)"
+                />
+
                 <input
                     v-if="action === 'logs'"
                     v-model.number="tailLines"
                     type="number"
-                    placeholder="tail lines (logs)"
+                    min="0"
+                    placeholder="tail lines"
                     class="default-input command-input"
                 />
-            </template>
-            <template v-else-if="action === 'apply'">
+
+                <input
+                    v-if="action === 'delete'"
+                    v-model="kind"
+                    class="default-input command-input"
+                    placeholder="kind override (optional)"
+                />
+
+                <template v-if="action === 'scale'">
+                    <input
+                        v-model="name"
+                        class="default-input command-input"
+                        placeholder="deployment name"
+                    />
+                    <input
+                        v-model.number="replicas"
+                        type="number"
+                        min="0"
+                        placeholder="replicas"
+                        class="default-input command-input"
+                    />
+                </template>
+            </div>
+
+            <div v-if="action === 'apply'">
                 <div class="apply-toolbar">
-                    <small class="hint"
-                        >Paste Kubernetes configuration (YAML or JSON). Support JSON of action/cluster_id/manifest</small
-                    >
+                    <span class="hint">Paste YAML/JSON. We auto-parse JSON if possible.</span>
                     <div class="spacer"></div>
-                    <button class="secondary-small-button" type="button" @click="fillNginx">Fill Nginx Example</button>
-                    <button class="secondary-small-button" type="button" @click="tryExtractFromJson">
-                        Try Extracting from JSON
-                    </button>
+                    <button class="secondary-small-button" type="button" @click="fillNginx">Sample Nginx</button>
+                    <button class="secondary-small-button" type="button" @click="tryExtractFromJson">Use JSON Fields</button>
                 </div>
                 <textarea
                     v-model="manifest"
-                    placeholder="Paste YAML or JSON manifest here"
-                    class="default-input command-input manifest-input"
+                    class="manifest-input"
+                    rows="10"
+                    placeholder="apiVersion: apps/v1\nkind: Deployment\n..."
                 ></textarea>
-            </template>
-            <template v-else-if="action === 'delete'">
-                <input v-model="name" placeholder="name (to delete)" class="default-input command-input" />
-                <input v-model="kind" placeholder="kind (optional, overrides resource)" class="default-input command-input" />
-            </template>
-            <template v-else-if="action === 'scale'">
-                <input v-model="name" placeholder="deployment name" class="default-input command-input" />
-                <input
-                    v-model.number="replicas"
-                    type="number"
-                    min="0"
-                    placeholder="replicas"
-                    class="default-input command-input"
-                />
-            </template>
-            <button class="primary-small-button" @click="executeCommand">RUN</button>
+            </div>
+
+            <button class="primary-small-button run-button" @click="executeCommand">RUN</button>
         </div>
 
         <div class="command-output">
@@ -393,82 +412,75 @@ function tryExtractFromJson() {
 </script>
 
 <style scoped>
-.commands-page {
-    width: 100%;
-    overflow-x: hidden; /* prevent page-level horizontal scroll */
+.commands-page { width: 100%; overflow-x: hidden; display: flex; flex-direction: column; gap: var(--space-4); }
+.hero { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.hero h2 { margin: 0; }
+.hero .muted { margin: 0.15rem 0 0; color: var(--color-text-muted); }
+.pill {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--color-primary);
+    font-weight: 600;
 }
+
+.card {
+    width: 100%;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
 .command-output {
     width: 100%;
-    margin-top: 20px;
     padding: 2rem;
-    background-color: white;
-    border-radius: 8px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
     box-sizing: border-box;
-    overflow-x: hidden; /* avoid horizontal scroll; rely on wrapping */
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
 }
 
-.result-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-.result-table th,
-.result-table td {
-    border: 1px solid #ddd;
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    vertical-align: top;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-}
-.item-head {
-    width: 220px;
-    background: #f7f7f7;
-}
-.item-body {
-    width: auto;
-    word-break: break-word;
-    overflow-wrap: anywhere; /* prevent long tokens from overflowing */
-    white-space: pre-wrap;
-}
-.result-empty {
-    color: #666;
-}
+.result-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: transparent; }
+.result-table th, .result-table td { border: 1px solid var(--glass-border); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; color: var(--color-text-primary); }
+.result-table th { background: var(--color-surface-hover); }
+.item-head { width: 220px; background: var(--color-surface-hover); }
+.item-body { width: auto; word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap; }
+.result-empty { color: var(--color-text-muted); }
 
-.command-input {
-    color: rgb(38, 38, 232);
-    min-width: 200px;
-}
+.command-input { color: var(--color-primary); min-width: 200px; }
 .manifest-input {
     width: 100%;
-    min-width: 0; /* avoid forcing overflow on small screens */
-    min-height: 120px;
+    min-width: 0;
+    min-height: 140px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    padding: var(--space-3);
 }
-.apply-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-}
-.apply-toolbar .spacer {
-    flex: 1;
-}
-.hint {
-    color: #666;
-}
+.apply-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.apply-toolbar .spacer { flex: 1; }
+.hint { color: var(--color-text-muted); }
 
-.controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
-    margin-bottom: 1rem;
-}
+.controls { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+
+.run-button { align-self: flex-start; }
 
 .cmd {
     font-weight: 600;
-    color: rgb(38, 38, 232);
+    color: var(--color-primary);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     overflow-wrap: anywhere;
 }

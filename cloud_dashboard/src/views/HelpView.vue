@@ -60,12 +60,10 @@
 <script setup lang="ts"></script>
 
 <style scoped>
-.page { max-width: 980px; padding: 16px 20px; }
-.hint { color: #666; font-size: 12px; margin: .25rem 0 .5rem; }
+.page { max-width: 980px; padding: 16px 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.hint { color: var(--color-text-muted); font-size: 12px; margin: .25rem 0 .5rem; }
 .el-collapse-item { margin-bottom: 10px; }
-/* add padding to title text */
 h2 { padding: 6px 8px; }
-/* add paddings to collapse headers and contents */
 :deep(.el-collapse-item__header) { padding: 10px 14px; }
 :deep(.el-collapse-item__content) { padding: 12px 16px; }
 :deep(.el-collapse) { margin-top: 8px; }

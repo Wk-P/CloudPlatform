@@ -458,13 +458,15 @@ function copyToClipboard(text: string) {
 .cluster-view {
     display: flex;
     flex-direction: column;
+    gap: var(--space-4);
 }
 .toolbar {
     display: flex;
     width: 100%;
     flex-direction: row;
     padding: 0.5rem;
-    flex-wrap: wrap; /* allow items to wrap to next line on narrow widths */
+    flex-wrap: wrap;
+    gap: var(--space-3);
 }
 
 .toolbar .spacer {
@@ -472,57 +474,62 @@ function copyToClipboard(text: string) {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
-    min-width: 0; /* prevent flex item from enforcing intrinsic width */
+    min-width: 0;
     margin-left: 120px;
 }
 
 .content {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 1.5rem;
     margin-top: 1rem;
 }
-
-/* ensure grid children can shrink within their columns */
 .content > .left,
 .content > .right {
     min-width: 0;
 }
-
 .right {
     flex: 1;
 }
 
 .panel {
-    background: #fff;
+    background: var(--glass-bg);
     padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-sm);
     margin-top: 10px;
 }
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed; /* prevent long content from expanding the table */
+    table-layout: fixed;
+    background: transparent;
+    border-radius: var(--radius-md);
+    overflow: hidden;
 }
 .data-table th,
 .data-table td {
-    border: 1px solid #ddd;
+    border: 1px solid var(--glass-border);
     padding: 8px;
     text-align: left;
     word-break: break-word;
     overflow-wrap: anywhere;
+    color: var(--color-text-primary);
+}
+.data-table th {
+    background: var(--color-surface-hover);
 }
 .chart {
     width: 100%;
     height: 320px;
 }
 .status.ok {
-    color: #2ecc71;
+    color: #22c55e;
     font-weight: 600;
 }
 .status.warn {
-    color: #e67e22;
+    color: #f59e0b;
     font-weight: 600;
 }
 .primary-button.cluster-detail {

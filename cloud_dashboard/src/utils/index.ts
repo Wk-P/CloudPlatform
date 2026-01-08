@@ -279,7 +279,7 @@ export const postCommand = async (payload: CommandPayload) => {
 export const getClusterUsage = async (id: string) => {
     try {
         const url = `${state_api.url}${state_api.cluster}${id}/`;
-    const response = await fetchWithAuth(url);
+        const response = await fetchWithAuth(url);
         const result = await response.json();
         console.log(result);
         return result;
@@ -289,8 +289,49 @@ export const getClusterUsage = async (id: string) => {
     }
 };
 
+export const getClusters = async () => {
+    try {
+        const url = getRuntimeApiFullUrl('clusters');
+        const response = await fetchWithAuth(url);
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error(error);
+        return [];
+    }
+};
 
-export const getAllNodesList  = async (id: string) => {
+export const getNodes = async (cluster_id: string) => {
+    try {
+        const url = `${runtime_api.url}/clusters/${cluster_id}${runtime_api.resources.nodes}`;
+        const response = await fetchWithAuth(url);
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error(error);
+        return [];
+    }
+};
+
+export const countResources = async (cluster_id: string) => {
+    try {
+        const [deployments, pods, services] = await Promise.all([
+            fetchWithAuth(`${runtime_api.url}/clusters/${cluster_id}${runtime_api.resources.deployments}`).then(r => r.json()),
+            fetchWithAuth(`${runtime_api.url}/clusters/${cluster_id}${runtime_api.resources.pods}`).then(r => r.json()),
+            fetchWithAuth(`${runtime_api.url}/clusters/${cluster_id}${runtime_api.resources.services}`).then(r => r.json()),
+        ]);
+        return {
+            deployments: Array.isArray(deployments) ? deployments.length : 0,
+            pods: Array.isArray(pods) ? pods.length : 0,
+            services: Array.isArray(services) ? services.length : 0,
+        };
+    } catch (error) {
+        console.error(error);
+        return { deployments: 0, pods: 0, services: 0 };
+    }
+};
+
+export const getAllNodesList = async (id: string) => {
     try {
     const url = `${runtime_api.url}/clusters/${id}${runtime_api.resources.nodes}`;
     const response = await fetchWithAuth(url);

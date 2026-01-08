@@ -3,10 +3,14 @@ cloud_backend URL configuration
 All API routes are grouped by app, with clear prefixes and consistent style.
 """
 
+from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
+    # Django Admin
+    path('admin/', admin.site.urls),
+
     # Anomaly Detection API (DetectorView)
     path('api/anomaly/', include('anomaly_detection.urls')),
 

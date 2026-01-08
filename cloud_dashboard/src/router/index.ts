@@ -83,9 +83,7 @@ function normalizeToken(t: string | null): string | null {
 }
 
 function getStoredToken(): string | null {
-    const raw =
-        localStorage.getItem('cloud-dashboard-token') ||
-        sessionStorage.getItem('cloud-dashboard-token');
+    const raw = localStorage.getItem('cloud-dashboard-token') || sessionStorage.getItem('cloud-dashboard-token');
     return normalizeToken(raw);
 }
 
@@ -97,7 +95,7 @@ function getStoredToken(): string | null {
 
 // Global auth guard: redirect to /login when no platform token
 router.beforeEach((to, _from, next) => {
-    const needsAuth = to.matched.some(r => {
+    const needsAuth = to.matched.some((r) => {
         const m = r.meta as Record<string, unknown> | undefined;
         return Boolean(m && (m as { requiresAuth?: boolean }).requiresAuth);
     });

@@ -48,8 +48,8 @@
                     </div>
                     <div class="metric-group">
                         <div class="metric-chip">
-                            <div class="metric-chip-value">{{ nodes.length }}</div>
-                            <div class="metric-chip-label">Nodes</div>
+                            <div class="metric-chip-value">{{ deploymentsCount }}</div>
+                            <div class="metric-chip-label">Deployments</div>
                         </div>
                         <div class="metric-chip">
                             <div class="metric-chip-value">{{ podsCount }}</div>
@@ -65,117 +65,121 @@
 
             <div class="nodes">
                 <h3>Nodes</h3>
-                <table class="table">
+                <table class="table" v-if="nodes.length">
                     <thead>
                         <tr>
                             <th>Name</th>
                             <th>Status</th>
                             <th>CPU</th>
                             <th>Memory</th>
-                            <th></th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="n in nodes" :key="n.name">
-                            <td>{{ n.name }}</td>
+                        <tr v-for="node in nodes" :key="node.name">
+                            <td>{{ node.name }}</td>
                             <td>
-                                <span :class="['status', n.status && n.status.toLowerCase() === 'ready' ? 'ok' : 'warn']">
-                                    {{ n.status }}
+                                <span :class="['status', node.status === 'Ready' ? 'ok' : 'warn']">
+                                    {{ node.status }}
                                 </span>
                             </td>
-                            <td>{{ perNode[n.name]?.cpu || '-' }}</td>
-                            <td>{{ perNode[n.name]?.memory || '-' }}</td>
+                            <td>{{ perNode[node.name]?.cpu || '-' }}</td>
+                            <td>{{ perNode[node.name]?.memory || '-' }}</td>
                             <td>
-                                <button class="mini primary-button" :disabled="perLoading[n.name]" @click="loadNode(n.name)">Usage</button>
+                                <button
+                                    class="mini primary-button"
+                                    :disabled="perLoading[node.name]"
+                                    @click="loadNode(node.name)"
+                                >
+                                    {{ perLoading[node.name] ? 'Loading...' : 'Load' }}
+                                </button>
                             </td>
                         </tr>
                     </tbody>
                 </table>
+                <div v-else class="empty">No nodes found.</div>
             </div>
         </template>
     </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
-import { getResourcesInfo, getClusterUsage, getAllNodesList, getNodeUsage } from '@/utils';
-import { useClusterStore } from '@/stores/cluster';
+import { ref, computed, onMounted } from 'vue';
+import { getClusters, getClusterUsage, getNodes, getNodeUsage, countResources } from '@/utils';
+import type { Cluster } from '@/interfaces';
 
-type ClusterItem = { id: number | string; name?: string };
-type NodeRow = { name: string; status?: string };
-
-const clusters = ref<ClusterItem[]>([]);
-const currentClusterId = ref<string>('');
-const clusterUsage = ref<Record<string, string>>({});
-const nodes = ref<NodeRow[]>([]);
-const perNode = ref<Record<string, { cpu: string; memory: string }>>({});
-const perLoading = ref<Record<string, boolean>>({});
-const podsCount = ref<number>(0);
-const servicesCount = ref<number>(0);
 const loading = ref(false);
+const currentClusterId = ref('');
+const clusters = ref<Cluster[]>([]);
 const updatedAt = ref('');
 
-const clusterStore = useClusterStore();
+interface ClusterUsage {
+    total_cpu?: string;
+    used_cpu?: string;
+    total_memory?: string;
+    used_memory?: string;
+    cpu_usage_percent?: number;
+    memory_usage_percent?: number;
+}
+const clusterUsage = ref<ClusterUsage>({});
+const cpuPercent = computed(() => clusterUsage.value.cpu_usage_percent ?? 0);
+const memPercent = computed(() => clusterUsage.value.memory_usage_percent ?? 0);
 
-const cpuPercent = computed<number>(() => {
-    const raw = String(clusterUsage.value.cpu_utilization || '').replace('%', '').trim();
-    const n = Number(raw);
-    if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
-    return 0;
-});
-const memPercent = computed<number>(() => {
-    const raw = String(clusterUsage.value.memory_utilization || '').replace('%', '').trim();
-    const n = Number(raw);
-    if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
-    return 0;
-});
+const deploymentsCount = ref(0);
+const podsCount = ref(0);
+const servicesCount = ref(0);
+
+interface Node {
+    name: string;
+    status: string;
+}
+const nodes = ref<Node[]>([]);
+const perNode = ref<Record<string, { cpu: string; memory: string }>>({});
+const perLoading = ref<Record<string, boolean>>({});
 
 const loadClusters = async () => {
-    const resp = await getResourcesInfo('clusters');
-    const list: ClusterItem[] = resp?.clusters || [];
-    clusters.value = list;
-    if (!list.length) {
-        currentClusterId.value = '';
-        return;
+    try {
+        const data = await getClusters();
+        clusters.value = data;
+        if (data.length && !currentClusterId.value) {
+            currentClusterId.value = String(data[0].id);
+        }
+    } catch (e) {
+        console.error(e);
     }
-    // try store
-    clusterStore.loadCurrentCluster();
-    const fromStore = clusterStore.getCurrentCluster?.();
-    currentClusterId.value = String(fromStore?.id || list[0].id);
 };
 
 const loadClusterUsage = async () => {
+    if (!currentClusterId.value) return;
     try {
-        const resp = await getClusterUsage(currentClusterId.value);
-        clusterUsage.value = resp || {};
+        const data = await getClusterUsage(currentClusterId.value);
+        clusterUsage.value = data as ClusterUsage;
     } catch (e) {
         console.error(e);
-        clusterUsage.value = {};
     }
 };
 
 const loadNodes = async () => {
+    if (!currentClusterId.value) return;
     try {
-        const resp = await getAllNodesList(currentClusterId.value);
-        const list: Array<{ name: string; status?: string }> = Array.isArray(resp?.nodes) ? resp.nodes : [];
-        nodes.value = list.map((n: { name: string; status?: string }) => ({ name: n.name, status: n.status }));
+        const data = await getNodes(currentClusterId.value);
+        nodes.value = (data as Node[]) || [];
     } catch (e) {
         console.error(e);
-        nodes.value = [];
     }
 };
 
 const loadPodsServicesCount = async () => {
+    if (!currentClusterId.value) return;
     try {
-        const podsResp = await getResourcesInfo('pods', currentClusterId.value);
-        podsCount.value = Array.isArray(podsResp?.pods) ? podsResp.pods.length : 0;
+        const data = await countResources(currentClusterId.value);
+        const d = data as Record<string, unknown>;
+        deploymentsCount.value = (d.deployments as number) || 0;
+        podsCount.value = (d.pods as number) || 0;
+        servicesCount.value = (d.services as number) || 0;
     } catch {
+        deploymentsCount.value = 0;
         podsCount.value = 0;
-    }
-    try {
-        const svcResp = await getResourcesInfo('services', currentClusterId.value);
-        servicesCount.value = Array.isArray(svcResp?.services) ? svcResp.services.length : 0;
-    } catch {
         servicesCount.value = 0;
     }
 };
@@ -209,56 +213,35 @@ const refreshAll = async () => {
     }
 };
 
-onMounted(async () => {
-    await loadClusters();
-    await refreshAll();
+onMounted(() => {
+    loadClusters().then(() => {
+        if (currentClusterId.value) {
+            refreshAll();
+        }
+    });
 });
 </script>
 
 <style scoped>
-.monitoring-wrapper {
-    width: 100%;
-}
-.toolbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 8px 0 16px;
-    flex-wrap: wrap;
-}
-.select {
-    padding: 6px 8px;
-}
-.updated {
-    color: #666;
-    font-size: 12px;
-}
-.empty {
-    color: #999;
-    padding: 8px 0;
-}
+.monitoring-wrapper { width: 100%; display: flex; flex-direction: column; gap: var(--space-4); }
+.toolbar { display: flex; align-items: center; gap: 12px; margin: 8px 0 16px; flex-wrap: wrap; }
+.select { padding: 6px 8px; }
+.updated { color: var(--color-text-muted); font-size: 12px; }
+.empty { color: var(--color-text-muted); padding: 8px 0; }
 
-.cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(260px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 20px; }
 .card {
-    background: #ffffff;
+    background: var(--glass-bg);
     border-radius: 14px;
     padding: 18px 18px 16px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
-    border: 1px solid #eef1f5;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--glass-border);
 }
 .card-header {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 6px;
-}
-.card-icon {
-    font-size: 22px;
 }
 .card h3 {
     margin: 0;
@@ -272,7 +255,7 @@ onMounted(async () => {
 .progress {
     height: 10px;
     width: 100%;
-    background: #f1f5f9;
+    background: var(--color-surface);
     border-radius: 999px;
     overflow: hidden;
 }
@@ -296,10 +279,11 @@ onMounted(async () => {
     align-items: center;
     justify-content: space-between;
     padding: 8px 10px;
-    background: #fafafa;
+    background: var(--color-surface);
+    border: 1px solid var(--glass-border);
     border-radius: 8px;
 }
-.kv-label { color: #6b7280; }
+.kv-label { color: var(--color-text-secondary); }
 .kv-value { font-weight: 600; }
 
 .metric-group {
@@ -309,14 +293,14 @@ onMounted(async () => {
     margin-top: 6px;
 }
 .metric-chip {
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+    background: var(--color-surface);
+    border: 1px solid var(--glass-border);
     border-radius: 10px;
     padding: 10px;
     text-align: center;
 }
 .metric-chip-value { font-size: 22px; font-weight: 700; }
-.metric-chip-label { font-size: 12px; color: #6b7280; }
+.metric-chip-label { font-size: 12px; color: var(--color-text-secondary); }
 
 .nodes {
     margin-top: 12px;
@@ -328,7 +312,7 @@ onMounted(async () => {
 .table th,
 .table td {
     padding: 8px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--glass-border);
     text-align: left;
 }
 .mini {
@@ -340,32 +324,15 @@ onMounted(async () => {
     font-size: 14px;
 }
 .status.ok {
-    background: #e8f5e9;
-    color: #2e7d32;
-    font-size: 14px;
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
 }
 .status.warn {
-    background: #fff3e0;
-    color: #ef6c00;
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
 }
 
-.primary-button {
-    padding: 6px 12px;
-}
-.monitoring-view.primary-button {
-    margin-left: 0;
-}
-
-.card-accent.cpu {
-    width: auto;
-}
-
-.card-accent.mem {
-    width: auto;
-}
-
-.card-accent.res {
-    width: auto;
-}
-
+.primary-button { padding: 6px 12px; margin-left: 0; }
+.card-accent.cpu, .card-accent.mem, .card-accent.res { width: auto; }
 </style>
+

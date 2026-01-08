@@ -37,4 +37,4 @@ logs/
 .ssh/
 
 
-**/conifg.json
+**/k8s_sa/config.json

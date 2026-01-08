@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import urllib3
+
+# Suppress InsecureRequestWarning for development environment
+# Remove this in production and use proper certificate verification
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

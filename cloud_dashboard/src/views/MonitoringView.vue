@@ -5,10 +5,11 @@
 
         <div class="toolbar">
             <label>Cluster:</label>
-            <select v-model="currentClusterId" @change="refreshAll" class="select">
-                <option v-for="c in clusters" :key="c.id" :value="String(c.id)">{{ c.name || `cluster-${c.id}` }}</option>
+            <select v-model="currentClusterId" @change="refreshAll" class="select" :disabled="!clusters.length">
+                <option v-if="!clusters.length" value="" disabled>No clusters available</option>
+                <option v-for="c in clusters" :key="c.id" :value="String(c.id)">{{ c.name || (c.id ? `Cluster ${c.id}` : 'Unknown') }}</option>
             </select>
-            <button class="primary-button" :disabled="loading" @click="refreshAll">Refresh</button>
+            <button class="primary-button" :disabled="loading || !clusters.length" @click="refreshAll">Refresh</button>
             <span class="updated" v-if="updatedAt">Updated: {{ updatedAt }}</span>
         </div>
 
@@ -104,10 +105,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { getClusters, getClusterUsage, getNodes, getNodeUsage, countResources } from '@/utils';
 import type { Cluster } from '@/interfaces';
+import { useClusterStore } from '@/stores/cluster';
 
+const clusterStore = useClusterStore();
 const loading = ref(false);
 const currentClusterId = ref('');
 const clusters = ref<Cluster[]>([]);
@@ -118,12 +121,20 @@ interface ClusterUsage {
     used_cpu?: string;
     total_memory?: string;
     used_memory?: string;
-    cpu_usage_percent?: number;
-    memory_usage_percent?: number;
+    cpu_utilization?: string;
+    memory_utilization?: string;
 }
 const clusterUsage = ref<ClusterUsage>({});
-const cpuPercent = computed(() => clusterUsage.value.cpu_usage_percent ?? 0);
-const memPercent = computed(() => clusterUsage.value.memory_usage_percent ?? 0);
+const cpuPercent = computed(() => {
+    const val = clusterUsage.value.cpu_utilization;
+    if (!val) return 0;
+    return parseFloat(val.replace('%', '')) || 0;
+});
+const memPercent = computed(() => {
+    const val = clusterUsage.value.memory_utilization;
+    if (!val) return 0;
+    return parseFloat(val.replace('%', '')) || 0;
+});
 
 const deploymentsCount = ref(0);
 const podsCount = ref(0);
@@ -140,9 +151,18 @@ const perLoading = ref<Record<string, boolean>>({});
 const loadClusters = async () => {
     try {
         const data = await getClusters();
-        clusters.value = data;
-        if (data.length && !currentClusterId.value) {
-            currentClusterId.value = String(data[0].id);
+        // 后端返回格式是 { clusters: [...] }
+        clusters.value = data?.clusters || [];
+        
+        // 优先使用 store 中的 currentCluster
+        clusterStore.loadCurrentCluster();
+        const storedCluster = clusterStore.getCurrentCluster();
+        
+        if (storedCluster && clusters.value.some((c: any) => c.id === storedCluster.id)) {
+            currentClusterId.value = String(storedCluster.id);
+        } else if (clusters.value.length) {
+            currentClusterId.value = String(clusters.value[0].id);
+            clusterStore.setCurrentCluster(clusters.value[0]);
         }
     } catch (e) {
         console.error(e);
@@ -212,6 +232,14 @@ const refreshAll = async () => {
         loading.value = false;
     }
 };
+
+// 监听 currentClusterId 变化，同步到 store
+watch(currentClusterId, (newId) => {
+    const selected = clusters.value.find(c => String(c.id) === newId);
+    if (selected) {
+        clusterStore.setCurrentCluster(selected);
+    }
+});
 
 onMounted(() => {
     loadClusters().then(() => {

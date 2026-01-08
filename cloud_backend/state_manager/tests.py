@@ -14,10 +14,16 @@ class StateManagerTests(TestCase):
         self.user = ManagerCustomUser.objects.create_user(username='u2', password='p')
         self.jwt = jwt_encode({'sub': str(self.user.uuid)})
         self.auth = {"HTTP_AUTHORIZATION": f"Bearer {self.jwt}"}
+        
+        # Read from environment or use localhost for testing
+        import os
+        test_api = os.getenv('TEST_K8S_API_SERVER', '127.0.0.1')
+        test_port = int(os.getenv('TEST_K8S_API_PORT', '8443'))
+        
         self.cluster = KubeCluster.objects.create(
             name="test-cluster",
-            api_server="192.168.0.247",
-            port=8443,
+            api_server=test_api,
+            port=test_port,
             description="test",
             cluster_id="test-id"
         )

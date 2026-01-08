@@ -1,7 +1,7 @@
 {
     "user": "cloudadmin",
     "password": "soar009@CloudAdmin",
-    "host": "192.168.0.247",
+    "host": "192.168.39.171",
     "port": "3306",
     "database": "cloudplatform"
 }

@@ -61,14 +61,23 @@ class LiveSAInfoTests(TestCase):
 	2) Env TEST_SA_TOKEN or K8S_SA_TOKEN
 
 	Host source:
-	- Env TEST_K8S_API_SERVER_URL, else default 'http://192.168.0.247:8099'
+	- Env TEST_K8S_API_SERVER_URL (required for anomaly detection service endpoint)
+	- No hardcoded defaults - test will skip if not configured
 
 	Test is skipped if token missing or 'kubernetes' package unavailable.
 	"""
 
 	def setUp(self):
+		from runtime_monitoring.models import KubeCluster
 		self.client = Client()
-		self.host = os.getenv('TEST_K8S_API_SERVER_URL') or 'http://192.168.0.247:8099'
+		# Anomaly detection service endpoint - must be configured via env or cluster.redis_report_endpoint
+		self.host = os.getenv('TEST_K8S_API_SERVER_URL')
+		if not self.host:
+			cluster = KubeCluster.objects.first()
+			if cluster and cluster.redis_report_endpoint:
+				self.host = cluster.redis_report_endpoint.replace('/report/read', '')
+			else:
+				self.skipTest('TEST_K8S_API_SERVER_URL not set and no cluster.redis_report_endpoint configured')
 
     # test nginx backend service
 	def test_sa_info_via_ingress_http(self):

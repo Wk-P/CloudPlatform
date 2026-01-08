@@ -331,12 +331,11 @@ const executeCommand = async () => {
 
 onMounted(() => {
     try {
-        const raw = useClusterStore() as unknown as {
-            getCurrentCluster?: () => Cluster | null | undefined;
-            currentCluster?: Cluster | null | undefined;
-        };
-        const c = typeof raw.getCurrentCluster === 'function' ? raw.getCurrentCluster() : raw.currentCluster;
-        if (c?.id && !clusterId.value) clusterId.value = String(c.id);
+        clusterStore.loadCurrentCluster();
+        const c = clusterStore.getCurrentCluster();
+        if (c?.id && !clusterId.value) {
+            clusterId.value = String(c.id);
+        }
     } catch {
         // ignore
     }

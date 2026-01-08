@@ -1,21 +1,28 @@
+from math import exp
 import requests
 import json
 import urllib3
+from pathlib import Path
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-token = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlZfRzRrQUpOaU5iTHM1N1ZPQnk2ODlMYm8xbkZzOXRPRjlxMXRGZ2pvX1EifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxNzgyNDY2OTgxLCJpYXQiOjE3NTA5MzA5ODEsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiZjFmOTAyNzgtNTgxZS00ZTIwLThlNTktMjczODk2MmFjNTYwIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJkZWZhdWx0Iiwic2VydmljZWFjY291bnQiOnsibmFtZSI6ImRqYW5nby1hZ2VudCIsInVpZCI6ImQ0N2ViNjRjLWI1ZmItNGI0Ny1iZjdiLWQwNzkyNjY2ZmQ0MiJ9fSwibmJmIjoxNzUwOTMwOTgxLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpkamFuZ28tYWdlbnQifQ.x-JIm17kazqAP6A8dW9KV8or2M-w487UuabiqKRgDG4z_C0EFKflJ9REiuIvPu7qUMAn9aK6ntkA7wvE2kIKvA0liZZiMX5O_65oAdUncfzQrsCfKUWHDzkvks4_Amk7E-4RVmOOKii3bdVzAVC03IJw-VExL7Qdv5w17ZXMYRgfneC3XJxAxrKrBhTxxD3kACxb66Iqg1vGUKNSf8pLMi0EV6cG7he5P4qIkKb3WMGCZnFzibPmyrWbtY282wZgoq2gSjXmVvRvBPxxRM8d7BAI3vd7aABi9UuO2A4vok4E2MPmpQKOzsw_BZOAgNfADzy4jmAfOjWbFLfThJCLdQ"
-url = "https://192.168.0.247:8443"
-separator = '-'*10
+# read token and url from config.json
+def load_config():
+    with open(Path(__file__).parent / 'config.json', 'r') as f:
+        config = json.load(f)
+    token = config['token']
+    url = config['endpoint']
+    separator = '-'*10
+    return token, url, separator
 
-def test_api_server():
+def test_api_server(url, token, separator):
     resp = requests.get(f"{url}/api", headers={"Authorization": f"Bearer {token}"}, verify=False)
     print('Test API Server connection')
     print("Status:", resp.status_code)
     print(json.dumps(resp.json(), indent=4)) 
     print(separator)
 
-def test_cluster():
+def test_cluster(url, token, separator):
     resp = requests.get(f"{url}/version", headers={"Authorization": f"Bearer {token}"}, verify=False)
     print('Test cluster info GET')
     print("Status:", resp.status_code)
@@ -23,7 +30,7 @@ def test_cluster():
     print(separator)
 
 
-def test_pods():
+def test_pods(url, token, separator):
     resp = requests.get(f"{url}/api/v1/pods", headers={"Authorization": f"Bearer {token}"}, verify=False)
     print('Test cluster pods info GET')
     print("Status:", resp.status_code)
@@ -36,7 +43,7 @@ def test_pods():
     print(separator)
 
 
-def test_nodes():
+def test_nodes(url, token, separator):
     resp = requests.get(f"{url}/api/v1/nodes", headers={"Authorization": f"Bearer {token}"}, verify=False)
     print('Test cluster nodes info GET')
     print("Status:", resp.status_code)
@@ -50,7 +57,24 @@ def test_nodes():
     print(separator)
 
 if __name__ == "__main__":
-    test_api_server()
-    test_cluster()
-    test_pods()
-    test_nodes()
+    token, url, separator = load_config()
+    try:
+        test_api_server(url=url, token=token, separator=separator)
+    except Exception as e:
+        print("Failed to connect to API server:", e)
+        exit(1)
+    try:
+        test_cluster(url=url, token=token, separator=separator)
+    except Exception as e:
+        print("Failed to get cluster info:", e)
+        exit(1)
+    try:
+        test_pods(url=url, token=token, separator=separator)
+    except Exception as e:
+        print("Failed to get pods info:", e)
+        exit(1)
+    try:
+        test_nodes(url=url, token=token, separator=separator)
+    except Exception as e:
+        print("Failed to get nodes info:", e)
+        exit(1)

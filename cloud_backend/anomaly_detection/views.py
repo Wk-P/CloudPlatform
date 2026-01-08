@@ -42,10 +42,56 @@ def ingress_traffic_trend(request):
 
 @jwt_required
 @require_http_methods(["GET"])
-def ingress_redis_data_read(_request):
-    # Implement your logic here
-    response = requests.get("http://192.168.0.247:8099/report/read")
-    if response.status_code == 200:
-        data = response.json()
-        return JsonResponse({"data": data})
-    return JsonResponse({"error": "Failed to read Redis data"}, status=500)
+def ingress_redis_data_read(request):
+    from runtime_monitoring.models import KubeCluster
+    from authentication.jwt_utils import jwt_decode
+    from authentication.models import ManagerCustomUser, K8sAccount
+    
+    # Get current user's cluster from request or default to first cluster
+    cluster_id = request.GET.get('cluster_id')
+    
+    if cluster_id:
+        try:
+            cluster = KubeCluster.objects.get(id=cluster_id)
+        except KubeCluster.DoesNotExist:
+            return JsonResponse({"error": "Cluster not found"}, status=404)
+    else:
+        # Try to get cluster from user's K8sAccount binding
+        auth = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION')
+        if auth and auth.startswith('Bearer '):
+            try:
+                payload = jwt_decode(auth.split(' ', 1)[1])
+                user = ManagerCustomUser.objects.get(uuid=payload.get('sub'))
+                k8s_acc = K8sAccount.objects.filter(user=user).order_by('-id').first()
+                if k8s_acc and k8s_acc.cluster:
+                    cluster = k8s_acc.cluster
+                else:
+                    cluster = KubeCluster.objects.first()
+            except Exception:
+                cluster = KubeCluster.objects.first()
+        else:
+            cluster = KubeCluster.objects.first()
+    
+    if not cluster:
+        return JsonResponse({"error": "No cluster configured"}, status=400)
+    
+    if not cluster.redis_report_endpoint:
+        return JsonResponse({
+            "error": "Redis report endpoint not configured for this cluster",
+            "cluster": cluster.name
+        }, status=400)
+    
+    try:
+        response = requests.get(cluster.redis_report_endpoint, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return JsonResponse({"data": data})
+        return JsonResponse({
+            "error": f"Redis service returned status {response.status_code}",
+            "details": response.text[:200]
+        }, status=response.status_code)
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            "error": "Failed to connect to Redis report service",
+            "details": str(e)
+        }, status=503)

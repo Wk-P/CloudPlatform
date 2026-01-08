@@ -81,7 +81,16 @@ const loadDashboard = async () => {
 
         clusterStore.loadCurrentCluster();
         const fromStore = clusterStore.getCurrentCluster?.();
-        currentClusterId.value = fromStore?.id || (clusters[0]?.id ?? null);
+        
+        // 优先使用 store 中的 cluster，确保与其他页面一致
+        if (fromStore && clusters.some((c: any) => c.id === fromStore.id)) {
+            currentClusterId.value = fromStore.id;
+        } else if (clusters[0]) {
+            currentClusterId.value = clusters[0].id;
+            clusterStore.setCurrentCluster(clusters[0]);
+        } else {
+            currentClusterId.value = null;
+        }
 
         if (currentClusterId.value) {
             const nodesResp = await getResourcesInfo('nodes', String(currentClusterId.value));

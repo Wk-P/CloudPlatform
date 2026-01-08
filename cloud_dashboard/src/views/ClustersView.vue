@@ -324,8 +324,10 @@ onMounted(async () => {
 }
 
 .register-form { margin: 1rem; display: flex; flex-direction: column; align-items: center; width: 80%; }
-.register-form label { display: flex; flex-direction: row; justify-content: space-between; width: 100%; margin: 0.5rem 0; }
-.register-form label span { padding-right: 1rem; display: flex; flex-direction: column; justify-content: center; }
+.register-form label { display: flex; flex-direction: row; align-items: center; width: 100%; margin: 0.5rem 0; }
+.register-form label span { min-width: 180px; padding-right: 1rem; display: flex; flex-direction: column; justify-content: center; }
+.register-form label input,
+.register-form label textarea { flex: 1; }
 
 .button-group { margin-top: 2rem; display: flex; flex-direction: row; justify-content: center; gap: 0.5rem; }
 .register-button-group { margin-left: 0; padding-left: 0; justify-content: left; }

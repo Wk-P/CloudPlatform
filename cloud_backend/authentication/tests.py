@@ -17,10 +17,21 @@ class AuthEndpointsTests(TestCase):
 
 class K8sApiServerTests(TestCase):
     def setUp(self):
+        from runtime_monitoring.models import KubeCluster
+        import os
         # real token file
         self.token = json.loads((Path(__file__).parent / 'k8s_test_auth_token' / 'token.json').read_text())[0]['token']
         self.headers = {'Authorization': f'Bearer {self.token}'}
-        self.api_server = 'https://192.168.0.247:8443'
+        
+        # Read from environment variable or KubeCluster model, never hardcode
+        api_from_env = os.getenv('TEST_K8S_API_SERVER')
+        if api_from_env:
+            self.api_server = api_from_env
+        else:
+            cluster = KubeCluster.objects.first()
+            if not cluster:
+                self.skipTest('No KubeCluster configured and TEST_K8S_API_SERVER not set')
+            self.api_server = f'https://{cluster.api_server}:{cluster.port}'
 
     def test_k8s_version(self):
         

@@ -4,7 +4,9 @@ from pathlib import Path
 import base64
 from datetime import datetime, timedelta, timezone
 
-K8S_API_SERVER = 'https://192.168.0.247:8443/'
+# DEPRECATED: Do not use global K8S_API_SERVER
+# Each cluster has its own api_server, retrieve from KubeCluster model
+# K8S_API_SERVER = 'https://192.168.0.247:8443/'  # OLD: hardcoded, no longer used
 
 
 def load_test_token():
@@ -40,8 +42,15 @@ def load_test_token():
     return best_token, best_exp
 
 def test_refresh_token():
-    K8S_API = K8S_API_SERVER
-    # K8S_API = account.k8s_api_server_url
+    # DEPRECATED: Should retrieve API server from KubeCluster model instead
+    # K8S_API = K8S_API_SERVER  # OLD: hardcoded global
+    # K8S_API = account.k8s_api_server_url  # OLD: duplicated in K8sAccount
+    from runtime_monitoring.models import KubeCluster
+    cluster = KubeCluster.objects.first()
+    if not cluster:
+        raise RuntimeError('No cluster configured')
+    K8S_API = f'https://{cluster.api_server}:{cluster.port}'
+    
     PLATFORM_BEAR_TOKEN, _ = load_test_token()
     TOKEN_FILE_PATH = Path(__file__).parent / 'k8s_test_auth_token' / 'token.json'
     SERVICEACCOUNT_NAME  = 'platform-admin'
@@ -126,9 +135,14 @@ def token_header(token: str):
 def test_https_width_token():
     try:
         token, _ = load_test_token()
-
+        from runtime_monitoring.models import KubeCluster
+        cluster = KubeCluster.objects.first()
+        if not cluster:
+            print('No cluster configured')
+            return
+        api_url = f'https://{cluster.api_server}:{cluster.port}/api'
         headers = {**token_header(token)}
-        resp = requests.get(f'{K8S_API_SERVER}/api', headers=headers, verify=False)
+        resp = requests.get(api_url, headers=headers, verify=False)
         print(resp.text)
 
     except RuntimeError as e:

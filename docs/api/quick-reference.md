@@ -57,7 +57,7 @@ Content-Type: application/json
 
 {
   "name": "prod-cluster",
-  "api_server": "192.168.0.247",
+  "api_server": "192.168.39.171",
   "port": 8443,
   "description": "Production Kubernetes Cluster"
 }

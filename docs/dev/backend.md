@@ -122,3 +122,42 @@ Django 后端与 k8s API 更多连接
 - 虚拟机
 - namespace
 - ...
+---
+
+## Testing
+
+### Environment Variables for Tests
+
+All tests dynamically read cluster configuration instead of hardcoded IPs.
+
+#### Authentication Tests
+```bash
+export TEST_K8S_API_SERVER="https://$(minikube ip):8443"
+```
+
+Or ensure a KubeCluster exists in database.
+
+#### State Manager Tests
+```bash
+export TEST_K8S_API_SERVER="$(minikube ip)"
+export TEST_K8S_API_PORT="8443"
+```
+
+#### Anomaly Detection Tests
+```bash
+export TEST_K8S_API_SERVER_URL="http://$(minikube ip):8099"
+```
+
+Or configure `redis_report_endpoint` on cluster.
+
+### Running Tests
+```bash
+python manage.py test
+python manage.py test authentication
+python manage.py test state_manager
+```
+
+### Architecture Notes
+- No hardcoded IPs - all from KubeCluster model
+- Tests auto-skip if cluster not configured
+- User registration auto-creates K8sAccount binding

@@ -36,6 +36,16 @@ CloudPlatform 是一个综合性云资源可视化管理系统，专为高效管
 
 ## 🚀 快速开始
 
+详细的安装和配置指南请参考：
+
+📖 **[完整文档索引](docs/INDEX.md)**
+
+- [快速入门指南](docs/GETTING_STARTED.md)
+- [后端开发文档](docs/dev/backend.md)
+- [前端开发文档](docs/dev/frontend.md)
+- [API 参考文档](docs/api/quick-reference.md)
+- [测试指南](docs/dev/backend-testing.md)
+
 ### 环境要求
 
 - Python 3.12+
@@ -109,7 +119,17 @@ CloudPlatform/
 - **API 文档**: http://localhost:8000/api/docs
 - **ReDoc**: http://localhost:8000/api/redoc
 
-## 👥 开发团队
+## � 文档
+
+所有文档已统一整理到 `docs/` 目录：
+
+- **[文档索引](docs/INDEX.md)** - 所有文档的目录和导航
+- **[快速入门](docs/GETTING_STARTED.md)** - 新手安装配置指南
+- **开发文档** - 详细的前后端开发指南
+- **API 文档** - RESTful API 参考手册
+- **测试文档** - 测试配置和运行指南
+
+## �👥 开发团队
 
 - **项目进度**: [Google Sheets](https://docs.google.com/spreadsheets/d/1ARk2cffz5Z87JNdB0r9kxZUGX4lG_xVBqmeZGHFJQAs/edit?usp=sharing)
 

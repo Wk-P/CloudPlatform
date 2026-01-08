@@ -12,7 +12,8 @@ class K8sAccount(models.Model):
     token_expire_time = models.DateTimeField(blank=True, null=True)
     user_group = models.TextField(blank=True, null=True)
     namespace = models.CharField(max_length=100, default='default')
-    k8s_api_server_url = models.CharField(max_length=100, blank=True, null=True)
+    # DEPRECATED: Retrieve API URL from cluster.api_server and cluster.port instead
+    k8s_api_server_url = models.CharField(max_length=100, blank=True, null=True, help_text="DEPRECATED: Use cluster.api_server instead")
 
 
 class OtherAccount(models.Model):
